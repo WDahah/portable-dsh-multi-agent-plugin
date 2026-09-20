@@ -1,0 +1,21 @@
+name: Question or idea
+description: Ask how something works, or suggest a change
+labels: [question]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        For how the design decisions were reached, see
+        [docs/DESIGN-NOTES.md](../../blob/master/docs/DESIGN-NOTES.md). You can try the
+        routing and verdict logic without a host by running `node demo.mjs`.
+  - type: textarea
+    id: question
+    attributes:
+      label: What would you like to know or change?
+    validations:
+      required: true
+  - type: textarea
+    id: context
+    attributes:
+      label: What are you trying to accomplish?
+      description: The underlying goal often matters more than the specific question.

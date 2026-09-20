@@ -6,6 +6,22 @@
       "sha256": "90fab223a2c6765dde57249cf558137f9e2bea2e51a0ad356d75626360a3d345"
     },
     {
+      "path": ".github/ISSUE_TEMPLATE/bug_report.yml",
+      "sha256": "bb4114eb4aac68ccbf581730c9724bbed692e759293a060b8b7db153da374666"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/config.yml",
+      "sha256": "948dee3dcc452cd91ad5e3efaa608c50b89f78f2f576142b996a163a860f0b56"
+    },
+    {
+      "path": ".github/ISSUE_TEMPLATE/question.yml",
+      "sha256": "16c35e5b25ed6c946c0962f58291087215548288fdf7eb32bc09bc1d4bf07962"
+    },
+    {
+      "path": ".github/PULL_REQUEST_TEMPLATE.md",
+      "sha256": "f7346ce77bf819d781dd4d5a190251c20768bfb4cbc29d171b8333f9d3c44e3a"
+    },
+    {
       "path": ".github/workflows/ci.yml",
       "sha256": "7159f0f6ebb6ada72f0659c3ec05ed0c7035143b71a4a30fd7e0ace7ec88f618"
     },
@@ -16,6 +32,10 @@
     {
       "path": "CHANGELOG.md",
       "sha256": "9fca8967956ca0275a8489e71a69eb912dab5c5807e8d240c50ff91cbb4bd189"
+    },
+    {
+      "path": "CODE_OF_CONDUCT.md",
+      "sha256": "96c2ed8c9e56480581770293ff86305dd5f5075485323243cad017d5d4241e60"
     },
     {
       "path": "CONTRIBUTING.md",
@@ -31,7 +51,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "5355db6660c1a9eda306c7af0c038db6247d2859be9530662886c9b5ee87aca1"
+      "sha256": "875bbac7b2ef60e1122f49c649086b935fa1f14e30b112a3121fc4b34d2604a5"
     },
     {
       "path": "SECURITY.md",
@@ -46,8 +66,16 @@
       "sha256": "ef2990f54f9e075fab6595d3fe6dbbba89802b59ddffc8185522199f09a8b4cc"
     },
     {
+      "path": "demo.mjs",
+      "sha256": "c111102de57c101a6ffe879959f9854e53f868101efe75077aa2cde1913a9c2e"
+    },
+    {
       "path": "docs/ARCHITECTURE.md",
       "sha256": "acac5e7766f6ac289899479290d48d5e60f1bc2ce19486a0c14892e05efc7de4"
+    },
+    {
+      "path": "docs/DESIGN-NOTES.md",
+      "sha256": "bc9cdfaab12269bd5bcc5e424564084ec218f09a2c503732584c143a6d634acf"
     },
     {
       "path": "docs/SECURITY-AND-LIMITS.md",
@@ -71,7 +99,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "089c995cfcdffba37af267a914cb214b748f558dfa7be666d3879f60eeb7cb84"
+      "sha256": "ea367b874c5d008badef1b1b1c1425a0f43f12f51bcdaec0088205ba50369a3c"
     },
     {
       "path": "scripts/doctor.mjs",
@@ -136,6 +164,10 @@
     {
       "path": "tests/core.test.mjs",
       "sha256": "aac2bd5fefc96858ec2a2d4102519fd5ff5a275b96a40a7dfdcf83e005d9c98b"
+    },
+    {
+      "path": "tests/demo.test.mjs",
+      "sha256": "81ea2f1df229b25e2b21ede560c3bfafa784e7b7a5c9eccfc61f0ebf00532768"
     },
     {
       "path": "tests/diagnostic.test.mjs",
