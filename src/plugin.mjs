@@ -1,6 +1,6 @@
 import path from 'node:path';
 import {registerLifetimeTool} from './cancellation.mjs';
-import {ROUTES, selectRoute} from './routes.mjs';
+import {ROUTES, POOL_PRIORITY, expectedEffort, selectRoute} from './routes.mjs';
 import {createTaskEngine} from './engine.mjs';
 import {createQualificationManager, need, BUILD_ID} from './qualification.mjs';
 import {createAgentDispatcher} from './agent-dispatch.mjs';
@@ -66,8 +66,9 @@ export function createPlugin(defineTool) {
         need(Object.values(route.effortsExpected).includes(args.effort), 'EFFORT_NOT_IN_ROUTE_POLICY');
         return entry.qualifications.qualify(route, args.effort, exec, {capabilities: args.capabilities, attestation: args.attestation});
       }, 190000);
-    async function choose(args, exec) {
-      const entry = owned(exec), selected = selectRoute({task: args.task, qualifications: await entry.qualifications.list()});
+    async function choose(args, exec, avoidProvider) {
+      const entry = owned(exec);
+      const selected = selectRoute({task: args.task, qualifications: await entry.qualifications.list(), avoidProvider});
       return {entry, selected};
     }
     const task = {task: {type: 'json', required: true}};
@@ -89,16 +90,69 @@ export function createPlugin(defineTool) {
     register('orchestrator_read', 'Read persisted direct-task output and accounting without model dispatch.',
       {task_id: {type: 'string', required: true}, page: {type: 'integer'}}, (args, exec) => owned(exec).engine.read(args.task_id, args.page ?? 0));
     register('orchestrator_delegate', 'Select a qualified route and run a real scoped child agent. Automatic new-child continuation is restricted to readonly tool sets; no error retry.',
-      {...task, run_id: {type: 'string', required: true}, prompt: {type: 'string', required: true}, allowed_tools: {type: 'array', items: {type: 'string'}}, max_rounds: {type: 'integer'}, max_tokens: {type: 'integer'}}, async (args, exec) => {
-        need(enabled, 'DISABLED'); const {entry, selected} = await choose(args, exec); if (selected.status !== 'SELECTED') return selected;
+      {...task, run_id: {type: 'string', required: true}, prompt: {type: 'string', required: true}, allowed_tools: {type: 'array', items: {type: 'string'}}, max_rounds: {type: 'integer'}, max_tokens: {type: 'integer'}, reviews: {type: 'string'}}, async (args, exec) => {
+        need(enabled, 'DISABLED');
+        // A review should not land on the model that produced the run it judges, so the
+        // subject's provider is avoided when one can be found.
+        let avoid;
+        if (args.reviews !== undefined) {
+          const subject = await owned(exec).agents.read(args.reviews);
+          avoid = subject.provider;
+        }
+        const {entry, selected} = await choose(args, exec, avoid); if (selected.status !== 'SELECTED') return selected;
         // The canonical role labels and records the run, so a deprecated code never leaks
         // into the session tree or the journal.
         return {selection: selected, delegation: await entry.agents.delegate(
-          {...args, role: selected.role, intent: selected.intent, evidence: selected.qualification},
+          {...args, role: selected.role, intent: selected.intent, evidence: selected.qualification,
+            independence: selected.independence ?? null},
           selected.route, selected.effort, exec)};
       }, 910000);
     register('orchestrator_delegate_read', 'Read immutable child-assignment output; never restarts the child.',
       {run_id: {type: 'string', required: true}, offset: {type: 'integer'}}, (args, exec) => owned(exec).agents.read(args.run_id, args.offset ?? 0));
+    register('orchestrator_capacity', 'Report which routes can be dispatched right now, per pool, with the providers they span and the exact probe that would fix anything unusable. Reads recorded evidence only; makes no provider call.',
+      {}, async (_args, exec) => {
+        const entry = owned(exec), records = await entry.qualifications.list(), now = Date.now();
+        const llm = ctx.get('llm'), registered = llm ? llm.listProviders().map(p => p.id) : [];
+        const subagents = ctx.get('subagents');
+        // outputSchema is a property of the spawn provider, not of any one model, so it is
+        // reported once rather than implied per route.
+        const spawn = subagents?.getProvider?.('spawn');
+        const pools = {};
+        for (const [pool, ids] of Object.entries(POOL_PRIORITY)) {
+          const entries = ids.map(id => {
+            const route = ROUTES.find(r => r.id === id), effort = expectedEffort(route, pool);
+            const matching = records.filter(q => q.provider === route.provider && q.model === route.model && q.effort === effort);
+            const newest = matching.length ? matching.reduce((a, b) => (a.issuedAt >= b.issuedAt ? a : b)) : null;
+            const dispatchable = !!newest && newest.available && newest.expiresAt > now && registered.includes(route.provider);
+            const view = {route_id: id, provider: route.provider, model: route.model, effort, dispatchable,
+              provider_registered: registered.includes(route.provider)};
+            if (!dispatchable) {
+              view.reason = !registered.includes(route.provider) ? 'PROVIDER_NOT_REGISTERED'
+                : !newest ? 'MISSING_EXACT_QUALIFICATION'
+                : !newest.available ? 'UNAVAILABLE_AT_PROBE'
+                : 'EXPIRED_QUALIFICATION';
+              view.requalify = {route_id: id, effort};
+            } else {
+              view.expiresAt = newest.expiresAt;
+              view.expiresInMs = newest.expiresAt - now;
+              view.imagePassed = newest.imagePassed === true;
+              view.domainEvidence = newest.domainEvidence === true;
+              view.allowedDataClasses = [...newest.allowedDataClasses];
+            }
+            return view;
+          });
+          const ready = entries.filter(e => e.dispatchable);
+          pools[pool] = {dispatchable: ready.length, total: entries.length,
+            // Distinct providers is what decides whether an independent review is possible.
+            providers: [...new Set(ready.map(e => e.provider))],
+            independentReviewPossible: new Set(ready.map(e => e.provider)).size >= 2,
+            routes: entries};
+        }
+        return {pools,
+          structuredVerdictSupported: spawn ? spawn.capabilities?.outputSchema === true : null,
+          reserveRoutes: ROUTES.filter(r => r.reserve).map(r => r.id),
+          evidenceExpiresInMs: records.length ? Math.max(...records.map(q => q.expiresAt)) - now : null};
+      });
     register('orchestrator_list', 'List saved assignments, direct tasks and qualification evidence for this owner; summaries only, no stored output or provider call.',
       {kind: {type: 'string'}}, async (args, exec) => {
         const kind = args.kind ?? 'all';

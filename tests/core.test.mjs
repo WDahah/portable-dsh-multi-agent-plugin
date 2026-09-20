@@ -17,10 +17,10 @@ const exec=(owner='parent')=>({agent:{id:owner},signal:new AbortController().sig
 // Explicit synthetic boundary: this is NOT the actual DSH defineTool or registry.
 const defineTool=definition=>({...definition});
 function context(services={}){const tools=new Map(),cleanups=[];return {tools,ctx:{tools:{register(tool){assert.equal(tools.has(tool.name),false);tools.set(tool.name,tool);return ()=>tools.delete(tool.name);}},get(name){return services[name];},effect(fn){const release=fn();cleanups.push(release);return release;}},dispose(){for(const release of cleanups.reverse())release?.();}};}
-test('portable factory injects native definition adapter, mounts eleven tools, and defaults disabled',async()=>{
+test('portable factory injects native definition adapter, mounts twelve tools, and defaults disabled',async()=>{
   assert.equal(createPlugin,namedFactory);assert.throws(()=>createPlugin(),/defineTool/);
   const plugin=createPlugin(defineTool);assert.equal(plugin.name,'portable-multi-agent');assert.deepEqual(plugin.inject,['tools']);
-  const h=context();plugin.apply(h.ctx,{stateRoot:fresh()});assert.equal(h.tools.size,11);
+  const h=context();plugin.apply(h.ctx,{stateRoot:fresh()});assert.equal(h.tools.size,12);
   const inventory=await h.tools.get('orchestrator_inventory').execute({},exec());assert.equal(inventory.enabled,false);assert.equal(inventory.build_id,'portable-multi-agent-1');assert.equal(inventory.approval_required,false);assert.equal(inventory.hard_budget_cap,false);assert.deepEqual(inventory.qualifications,[]);
   assert.equal(h.tools.get('orchestrator_plan').timeoutMs,60000);assert.equal(h.tools.get('orchestrator_run').timeoutMs,910000);
   const refused=await h.tools.get('orchestrator_qualify').execute({route_id:'codex-terra',effort:'medium'},exec());assert.equal(refused.status,'BRIDGE_REFUSED_OR_FAILED');assert.equal(refused.reason,'DISABLED');h.dispose();assert.equal(h.tools.size,0);
