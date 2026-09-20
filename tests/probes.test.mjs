@@ -8,8 +8,9 @@ import path from 'node:path';
 import {solidPng, createImageProbe, createStructuredProbe, PROBE_COLORS, IMAGE_PROBE_PANELS} from '../src/probes.mjs';
 import {createQualificationManager, normalizeAttestation, BASE_DATA_CLASSES} from '../src/qualification.mjs';
 import {ROUTES, selectRoute} from '../src/routes.mjs';
+import {makeTempRoot} from './helpers/tmp.mjs';
 
-const root = await fs.mkdtemp(path.join(os.tmpdir(), 'portable-probe-test-'));
+const root = await makeTempRoot('portable-probe-test-');
 after(() => fs.rm(root, {recursive: true, force: true}));
 let sequence = 0;
 const fresh = () => path.join(root, 'case-' + ++sequence);

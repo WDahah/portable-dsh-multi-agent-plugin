@@ -9,8 +9,9 @@ import {registerLifetimeTool} from '../src/cancellation.mjs';
 import {BUILD_ID,createQualificationManager,createRecordStore,keyOf} from '../src/qualification.mjs';
 import {createAgentDispatcher} from '../src/agent-dispatch.mjs';
 import {createTaskEngine} from '../src/engine.mjs';
-const root=await fs.mkdtemp(path.join(os.tmpdir(),'multi-agent-test-core-'));let sequence=0;
-after(async()=>{assert.equal(path.dirname(root),os.tmpdir());assert.ok(path.basename(root).startsWith('multi-agent-test-core-'));await fs.rm(root,{recursive:true,force:true});});
+import {makeTempRoot, resolvedTmpdir} from './helpers/tmp.mjs';
+const root=await makeTempRoot('multi-agent-test-core-');let sequence=0;
+after(async()=>{assert.equal(path.dirname(root),await resolvedTmpdir());assert.ok(path.basename(root).startsWith('multi-agent-test-core-'));await fs.rm(root,{recursive:true,force:true});});
 const fresh=()=>path.join(root,String(++sequence));
 const exec=(owner='parent')=>({agent:{id:owner},signal:new AbortController().signal});
 // Explicit synthetic boundary: this is NOT the actual DSH defineTool or registry.

@@ -15,6 +15,12 @@ claims, and none of them is promoted by a release note.
   blocked installation for exactly the users who followed instructions. Existing Windows
   clones must be re-cloned or refreshed (`git rm -r --cached . && git reset --hard`) for
   the normalized bytes to take effect.
+- **The test suite failed on macOS and Windows** wherever the system temporary directory
+  is reached through a link. Fixtures built their working directories on the raw
+  `os.tmpdir()` value, and the journal correctly refuses any path containing a symbolic
+  link, so those runs died with `UNSAFE_JOURNAL_PATH` for a reason unrelated to the
+  behavior under test. Fixtures now resolve the temporary root first; the production
+  path check is unchanged. This was visible only once CI covered more than Linux.
 - Tool refusals no longer collapse every failure into one opaque status. A refusal now
   carries an allowlisted `reason` such as `UNKNOWN_ROUTE`, `INVALID_RUN_ID`, or
   `QUALIFICATION_BUSY`. Unrecognized failures still report `UNAVAILABLE`, so provider

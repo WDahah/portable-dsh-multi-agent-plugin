@@ -6,8 +6,9 @@ import path from 'node:path';
 import os from 'node:os';
 import {createTaskEngine} from '../src/engine.mjs';
 import {createPlugin} from '../src/plugin.mjs';
+import {makeTempRoot} from './helpers/tmp.mjs';
 
-const fixtures = await fs.mkdtemp(path.join(os.tmpdir(), 'portable-diagnostic-test-'));
+const fixtures = await makeTempRoot('portable-diagnostic-test-');
 // Cleanup is restricted to this file's uniquely created temporary root.
 after(() => fs.rm(fixtures, {recursive: true, force: true}));
 const root = () => fs.mkdtemp(path.join(fixtures, 'case-'));
