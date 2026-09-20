@@ -15,7 +15,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "b2101a54a520df75c053d27e968d824eabb02dc99f00eb01928dc157c6b02cf3"
+      "sha256": "b24a84d4b7350e432660c8dc725fda2f58b40fcd643752f31568ac8bf76f1a40"
     },
     {
       "path": "CONTRIBUTING.md",
@@ -23,7 +23,7 @@
     },
     {
       "path": "INSTALL-WITH-AI.md",
-      "sha256": "9924dcbaa66247e1ae827954dac4d1d4de386b8bb0d3832504f4a2c4d525c3b1"
+      "sha256": "364c4c9b575b00b231c2cb4fa0d31d0d147e1e04449413052f390ca488dfcb37"
     },
     {
       "path": "LICENSE",
@@ -31,7 +31,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "83a573ea2a8cc8e508544b47ca0d1695e942a45f83f87931b10dc1473ae0f4c2"
+      "sha256": "7450d68c201a57c8fdbad3c7d3cba097ccb6c6d71e5905bc98c1fe2d15daec25"
     },
     {
       "path": "SECURITY.md",
@@ -51,15 +51,15 @@
     },
     {
       "path": "docs/SECURITY-AND-LIMITS.md",
-      "sha256": "3582135aa4ad4c95354a8e51c7c807ce8a4ea6261a5ace256133c694514e15bd"
+      "sha256": "1e9a62ae5c34b1e33eae525c1037ca522b0841677ea94de5d0386d56093b5728"
     },
     {
       "path": "docs/USAGE.md",
-      "sha256": "76720d6b441feb255a7e6d2d41ea0270fd069b2c8e51ebc2980074d89cbba043"
+      "sha256": "58de67332188cc6fcd7ea5984852322566e8ebbffe546a7168d692de819389f5"
     },
     {
       "path": "examples/PROJECT-PROMPT.md",
-      "sha256": "31429cb0f400dc9bd18c25013c6d5d061f6dec384d803533659afa867c80f619"
+      "sha256": "8be1d9682ad1a56dcece87cc70857a27c4fbb9c56aa24c70871770a8c34ca13e"
     },
     {
       "path": "examples/host-patch.example.yml",
@@ -67,11 +67,11 @@
     },
     {
       "path": "examples/task.json",
-      "sha256": "344de56d10ddd4153757b6ce5492637dc988a9bffadcf3c5b1b2ad13c7c5f8dd"
+      "sha256": "182199a479d3be2ea5d0d06681a8ce0e659779dfa015659c00175c693fa7c1f4"
     },
     {
       "path": "package.json",
-      "sha256": "f90195ec413d9c095bedef137f4c0c58025b672b4b35d3278091d37abcf6d182"
+      "sha256": "5085e69e4694fff100c9a0f42494e819e23a3e00238495dc2303d6064752b0cc"
     },
     {
       "path": "scripts/doctor.mjs",
@@ -91,7 +91,7 @@
     },
     {
       "path": "src/agent-dispatch.mjs",
-      "sha256": "142e9b6af2c9bf304149076e8428324483fb842297d4e8ea4a6824fbe3402a88"
+      "sha256": "4413082fa440127dacde9c2ad09fbcbe3436ca9bb68a46ed91a8e909d23bb9ad"
     },
     {
       "path": "src/cancellation.mjs",
@@ -107,7 +107,7 @@
     },
     {
       "path": "src/plugin.mjs",
-      "sha256": "50f857b59a471a5b3457be5662531cbab7f7b27c321b411f70c80fdcdc2405be"
+      "sha256": "893a97123c739924929c7437eabdd2a59c757a17ac3384aa19f6719d3fbde055"
     },
     {
       "path": "src/probes.mjs",
@@ -119,7 +119,7 @@
     },
     {
       "path": "src/routes.mjs",
-      "sha256": "52404c154f2eb38f7b47711b0df46a24b0693f1ad4a99b4ce9db2fea4be047aa"
+      "sha256": "f932554c712ebca1c648f5e7a5ffb3e458d08c75c93aac96965829beaac907ed"
     },
     {
       "path": "tests/attribution.test.mjs",
@@ -156,6 +156,10 @@
     {
       "path": "tests/reporting.test.mjs",
       "sha256": "97ff25912c45de5bbfde7dea9761eca1bb7f40d6094a6ef60912e09c00de68e1"
+    },
+    {
+      "path": "tests/roles.test.mjs",
+      "sha256": "0129c51da794eddd4da3e472630e25c015c5c529f7fb1c9398fe1fb7872128e8"
     },
     {
       "path": "tests/routes.test.mjs",

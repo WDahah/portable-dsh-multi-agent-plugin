@@ -44,7 +44,7 @@ The example `examples/task.json` contains metadata only. Pass it as the `task` f
 
 ```json
 {
-  "task": {"role":"R04","category":"implementation","risk":"low","complexity":"routine","escalate":false,"dataClass":"internal","capabilities":["text","tools"]},
+  "task": {"role":"standard","intent":"add password reset","category":"implementation","risk":"low","complexity":"routine","escalate":false,"dataClass":"internal","capabilities":["text","tools"]},
   "run_id": "project-inspect-unique-001",
   "prompt": "INSPECT ONLY. Project: <absolute project path>. Read only <explicit allowed paths>. Explain the smallest change for <objective>; do not edit, run commands, access network, or delegate. Stop after a concise plan with acceptance checks.",
   "allowed_tools": ["read", "glob", "grep"],
@@ -55,9 +55,35 @@ The example `examples/task.json` contains metadata only. Pass it as the `task` f
 
 Use a **new unique ID** for each new assignment. Read it back with `orchestrator_delegate_read({"run_id":"project-inspect-unique-001"})`. An existing ID cannot be reset to dispatch again. For implementation, provide an explicit file-write scope and add `write`/`edit` only when authorized. Add `pwsh` only when necessary and permitted; it is not a sandbox bypass. Research/network tools are not automatically available through this allowlist.
 
-Useful general role labels: `R01` planning, `R04` implementation, `R07` review, `R11` integration. Categories are nonempty descriptive strings; they do not grant capabilities or specialist certification. Risk: `low|medium|high|critical`; complexity: `routine|moderate|complex`; `escalate` is a required boolean. Basic qualification admits public/internal policy classes, not a confidentiality guarantee.
+Categories are nonempty descriptive strings; they do not grant capabilities or specialist certification. Risk: `low|medium|high|critical`; complexity: `routine|moderate|complex`; `escalate` is a required boolean. Basic qualification admits public/internal policy classes, not a confidentiality guarantee.
 
-Ordinary tasks default to balanced routing. Certain roles, high/critical risk or complex work select advanced; escalation selects long-horizon. An explicit `pool` can select economy or another deliberate policy choice. It is not a silent fallback. Exact model IDs and efforts come from `src/routes.mjs` and live host evidence, never from guessing a brand label.
+## Roles and intent
+
+A **role** names how the task is routed. There are five, and each one means something you can observe in the result:
+
+| Role | Routes to | Requires |
+|---|---|---|
+| `standard` | balanced pool, standard effort | — |
+| `deep` | advanced pool, deep effort | — |
+| `review` | advanced pool, deep effort | — |
+| `vision` | balanced pool, standard effort | a passed image probe |
+| `domain` | advanced pool, deep effort | an operator attestation |
+
+An **intent** is your own sentence for what the task is for — `"add password reset"`, `"check the migration plan"`. It is recorded on the assignment, shown in the child's label, and returned by `orchestrator_list`. **It never affects routing**: two runs with opposite intents and the same role reach the same model. That is deliberate — a label that quietly changed the model would be a routing rule pretending to be documentation.
+
+The numeric codes `R01`–`R12` shipped since 1.0.0 still work and route exactly as before, but they are deprecated. A selection reports `role` (canonical), `roleSupplied` (what you passed), and `roleDeprecated`, and adds a `DEPRECATED_ROLE_CODE` warning, so migration needs no guesswork:
+
+| Code | Now |
+|---|---|
+| `R01` `R02` `R04` `R06` `R10` `R11` | `standard` |
+| `R03` `R12` | `deep` |
+| `R07` | `review` |
+| `R05` | `vision` |
+| `R08` `R09` | `domain` |
+
+`R02`, `R03`, `R06`, `R10` and `R12` were never documented; each maps to the behavior it already produced, not to a meaning invented after the fact. `R08` and `R09` were always identical, so both map to `domain`.
+
+Ordinary tasks default to balanced routing. An advanced role, high/critical risk, or complex work selects advanced; escalation selects long-horizon. An explicit `pool` can select economy or another deliberate policy choice, and beats everything else. It is not a silent fallback. Exact model IDs and efforts come from `src/routes.mjs` and live host evidence, never from guessing a brand label.
 
 ## Direct-model tasks
 

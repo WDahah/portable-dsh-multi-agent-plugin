@@ -91,7 +91,11 @@ export function createPlugin(defineTool) {
     register('orchestrator_delegate', 'Select a qualified route and run a real scoped child agent. Automatic new-child continuation is restricted to readonly tool sets; no error retry.',
       {...task, run_id: {type: 'string', required: true}, prompt: {type: 'string', required: true}, allowed_tools: {type: 'array', items: {type: 'string'}}, max_rounds: {type: 'integer'}, max_tokens: {type: 'integer'}}, async (args, exec) => {
         need(enabled, 'DISABLED'); const {entry, selected} = await choose(args, exec); if (selected.status !== 'SELECTED') return selected;
-        return {selection: selected, delegation: await entry.agents.delegate({...args, role: args.task.role, evidence: selected.qualification}, selected.route, selected.effort, exec)};
+        // The canonical role labels and records the run, so a deprecated code never leaks
+        // into the session tree or the journal.
+        return {selection: selected, delegation: await entry.agents.delegate(
+          {...args, role: selected.role, intent: selected.intent, evidence: selected.qualification},
+          selected.route, selected.effort, exec)};
       }, 910000);
     register('orchestrator_delegate_read', 'Read immutable child-assignment output; never restarts the child.',
       {run_id: {type: 'string', required: true}, offset: {type: 'integer'}}, (args, exec) => owned(exec).agents.read(args.run_id, args.offset ?? 0));
