@@ -75,6 +75,20 @@ Every result attributes its work to an exact route. A delegated assignment repor
 
 Each round also carries `route_recorded_per_round` (`routeRecordedPerRound` for direct tasks). When it is `false`, that round predates per-round routes and the reported model comes from the task's route rather than from a value stored with the round. A stored round route must match the route its task planned, so an edited journal cannot attribute a round to a model that never ran it.
 
+## When a route is refused
+
+An `UNAVAILABLE` selection lists one entry per candidate route, and each entry carries a `requalify` object holding the exact `orchestrator_qualify` arguments that would resolve it — including `capabilities` for a probe-backed requirement and an `attestation` skeleton for domain or data-class policy, which no probe can grant. An `EXPIRED_QUALIFICATION` entry also reports `expiredAt` and `expiredForMs`.
+
+Fill in the attestation placeholders yourself: they prompt for a human statement, not values to invent.
+
+## Reading cost and usage
+
+Only routes with published pricing report a currency cost, so `costUnknown: true` is ordinary and never means the work was free. Direct tasks report token `usage` per round and as a task total, plus `usageRoundsMissing` when a round never settled — a `null` usage beside a count of unsettled rounds, rather than a zero that would read as no consumption.
+
+Delegated assignments report `usage: null` with `usage_reason: "CHILD_RESULT_CARRIES_NO_USAGE"`, because the host's child-agent result contract carries no usage for this plugin to read.
+
+A route in no pool is reported as `reserve: true` by `orchestrator_inventory`. It is held back deliberately and can only be reached through an explicit `pool` choice or a policy change — it is not a broken or failed entry.
+
 ## Reading outcomes honestly
 
 Inspect terminal status, selected route/effort, round count, saved text and accounting. A successful stop is not semantic acceptance of code. Run project-specific tests under the project's permissions. Raw continuation aggregation may join adjacent lines/words; preserve round boundaries when checking exact output.

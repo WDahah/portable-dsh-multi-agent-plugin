@@ -25,7 +25,14 @@ export function createTaskEngine({root,owner,getLlm,clock=Date.now,deadlineMs=HA
   function view(id,r,page=0){need(integer(page),'INVALID_PAGE');const text=r.rounds.map(x=>x.visibleText).join('');const offset=page*12000;need(integer(offset)&&offset<=text.length,'INVALID_PAGE');return {task_id:id,status:r.status,revision:r.revision,requestHash:r.requestHash,roundCount:r.rounds.length,maxRounds:r.request.maxRounds,spentMicros:r.spentMicros,settledKnownMicros:r.spentMicros,heldMicros:r.heldMicros,costUnknown:r.costUnknown,softTargetUsd:1,overTarget:r.spentMicros>1_000_000,approvalRequired:false,automaticRetries:false,resumable:SAFE.includes(r.status)&&!r.persistenceFailed&&clock()<r.request.deadlineAt,deadlineAt:r.request.deadlineAt,persistenceFailed:r.persistenceFailed===true,page,text:text.slice(offset,offset+12000),totalChars:text.length,nextPage:offset+12000<text.length?page+1:null,rounds:r.rounds.map(x=>({attemptId:x.attemptId,status:x.status,visibleChars:x.visibleText.length,finish:x.finish,costMicros:x.costMicros,holdMicros:x.holdMicros,
     // Rounds written before per-round routes existed fall back to the task route.
     provider:x.route?.provider??r.request.route.provider,model:x.route?.model??r.request.route.model,effort:x.route?.effort??r.request.route.effort,
-    routeRecordedPerRound:x.route!==undefined})),
+    routeRecordedPerRound:x.route!==undefined,
+    // Token counts are the only usage signal for a route with no published pricing, where
+    // costMicros is legitimately null. Reporting them avoids implying the work was free.
+    usage:x.usage?{inputTokens:x.usage.inputTokens,cacheReadTokens:x.usage.cacheReadTokens,outputTokens:x.usage.outputTokens,totalTokens:x.usage.totalTokens,cacheWriteTokens:x.usage.cacheWriteTokens,reasoningTokens:x.usage.reasoningTokens}:null})),
+    // Aggregate tokens across settled rounds, so an unpriced route still reports usage.
+    usage:(()=>{const settled=r.rounds.filter(x=>x.usage);if(!settled.length)return null;
+      return settled.reduce((total,x)=>({inputTokens:total.inputTokens+x.usage.inputTokens,cacheReadTokens:total.cacheReadTokens+x.usage.cacheReadTokens,outputTokens:total.outputTokens+x.usage.outputTokens,totalTokens:total.totalTokens+x.usage.totalTokens,cacheWriteTokens:total.cacheWriteTokens+x.usage.cacheWriteTokens,reasoningTokens:(total.reasoningTokens??0)+(x.usage.reasoningTokens??0)}),{inputTokens:0,cacheReadTokens:0,outputTokens:0,totalTokens:0,cacheWriteTokens:0,reasoningTokens:0});})(),
+    usageRoundsMissing:r.rounds.filter(x=>!x.usage).length,
     route:{provider:r.request.route.provider,model:r.request.route.model,effort:r.request.route.effort,maxTokens:r.request.route.maxTokens},
     // The original request travels with the result so a saved task can be audited for
     // what was asked, not only for what the model returned.

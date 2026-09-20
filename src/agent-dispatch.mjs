@@ -89,7 +89,10 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
       // audited for what was asked, not only for what came back.
       prompt: record.prompt, allowed_tools: [...(record.allowed_tools ?? [])],
       text: record.visibleText.slice(offset, offset + 12000), total_chars: record.visibleText.length,
-      next_offset: Math.min(record.visibleText.length, offset + 12000), cost_unknown: true, soft_target_usd: 1,
+      next_offset: Math.min(record.visibleText.length, offset + 12000), cost_unknown: true,
+      // The child-agent result contract carries no usage, so no token count exists to
+      // report here. Naming the reason keeps an unknown cost from reading as a free one.
+      usage: null, usage_reason: 'CHILD_RESULT_CARRIES_NO_USAGE', soft_target_usd: 1,
       approval_required: false, automatic_retry: false, continuation_safe: record.continuation_safe, continuation_uses_new_child: true};
   }
   async function read(runId, offset = 0) {

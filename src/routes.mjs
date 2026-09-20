@@ -11,7 +11,9 @@ const standard = {standard: 'medium', deep: 'high', long: 'xhigh'};
 const thinking = {standard: 'high', deep: 'high', long: 'max'};
 const price = {currency: 'USD', inputPerMillion: 0.30, outputPerMillion: 1.20, kind: 'conservative-estimate', currentPriceVerified: false};
 function route(id, candidateId, provider, model, pools, note, image = false) {
-  return {id, candidateId, provider, model, pools,
+  // A route in no pool is a declared reserve, not a broken entry: it can never be selected
+  // automatically, and only an explicit pool choice or a policy change would activate it.
+  return {id, candidateId, provider, model, pools, reserve: pools.length === 0,
     effortsExpected: provider === 'codex' || provider === 'claude' ? {...standard} : {...thinking},
     capabilitiesRequired: image ? ['text', 'tools', 'image'] : ['text', 'tools'],
     pricing: provider === 'deepseek-official' && ['deepseek-flash', 'deepseek-v4-flash'].includes(model) ? {...price} : null,
@@ -107,13 +109,37 @@ export function selectRoute({task, qualifications, now = Date.now()} = {}) {
   for (const id of POOL_PRIORITY[policy.pool]) {
     const route = ROUTES.find(r => r.id === id), effort = expectedEffort(route, policy.pool);
     const matching = qualifications.filter(q => q && q.provider === route.provider && q.model === route.model && q.effort === effort);
-    if (!matching.length) {reasons.push({id, effort, reason: 'MISSING_EXACT_QUALIFICATION'}); continue;}
+    if (!matching.length) {
+      // With no evidence at all, the hint must still name every capability this task will
+      // need, or following it would produce evidence that cannot satisfy the task.
+      const needed = [...new Set([...(task.capabilities ?? []), ...(task.role === 'R05' ? ['image'] : [])])]
+        .filter(capability => capability !== 'text' && capability !== 'tools');
+      const requalify = {route_id: id, effort};
+      if (needed.length) requalify.capabilities = needed;
+      if (domainRoles.has(task.role)) requalify.attestation = {domainEvidence: true, attestedBy: '<who reviewed this>', basis: '<what you reviewed or ran>'};
+      if (task.dataClass && !BASE_DATA_CLASSES.includes(task.dataClass)) {
+        requalify.attestation = {...(requalify.attestation ?? {}), dataClasses: [...BASE_DATA_CLASSES, task.dataClass], attestedBy: '<who reviewed this>', basis: '<what you reviewed or ran>'};
+      }
+      reasons.push({id, effort, reason: 'MISSING_EXACT_QUALIFICATION', requalify}); continue;
+    }
     // A later failure supersedes earlier success. Ties refuse rather than depend on array order.
     if (matching.some(q => !integer(q.issuedAt))) {reasons.push({id, effort, reason: 'INVALID_QUALIFICATION'}); continue;}
     const newest = Math.max(...matching.map(q => q.issuedAt));
     const latest = matching.filter(q => q.issuedAt === newest);
     const reason = latest.length !== 1 ? 'AMBIGUOUS_LATEST_QUALIFICATION' : recordReason(latest[0], route, effort, task, now);
-    if (reason) {reasons.push({id, effort, reason}); continue;}
+    if (reason) {
+      // Every refusal names the exact probe that would resolve it, so a caller is not left
+      // to guess which route and effort to qualify next.
+      const entry = {id, effort, reason, requalify: {route_id: id, effort}};
+      if (reason === 'EXPIRED_QUALIFICATION') {entry.expiredAt = latest[0].expiresAt; entry.expiredForMs = now - latest[0].expiresAt;}
+      if (reason === 'IMAGE_PROBE_REQUIRED') entry.requalify.capabilities = ['image'];
+      if (reason.startsWith('CAPABILITY_PROBE_REQUIRED:')) entry.requalify.capabilities = [reason.slice('CAPABILITY_PROBE_REQUIRED:'.length)];
+      // Domain and data-class policy is attested, never probed, so say so instead of
+      // implying another probe would grant it.
+      if (reason === 'DOMAIN_EVIDENCE_REQUIRED') entry.requalify.attestation = {domainEvidence: true, attestedBy: '<who reviewed this>', basis: '<what you reviewed or ran>'};
+      if (reason === 'DATA_CLASS_NOT_QUALIFIED') entry.requalify.attestation = {dataClasses: [...BASE_DATA_CLASSES, task.dataClass ?? 'public'], attestedBy: '<who reviewed this>', basis: '<what you reviewed or ran>'};
+      reasons.push(entry); continue;
+    }
     return {...base, status: 'SELECTED', route, effort, pool: policy.pool, reason: policy.reason,
       qualification: {issuedAt: latest[0].issuedAt, expiresAt: latest[0].expiresAt, runtimeBuildId: latest[0].runtimeBuildId, adapterFingerprint: latest[0].adapterFingerprint, domainEvidence: latest[0].domainEvidence},
       warnings: ['SMOKE_IS_NOT_ROLE_COMPETENCE_CERTIFICATION', 'MODEL_STRING_IS_NOT_IMMUTABLE_BACKEND_IDENTITY'], reasons};

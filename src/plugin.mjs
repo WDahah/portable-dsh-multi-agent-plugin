@@ -54,7 +54,10 @@ export function createPlugin(defineTool) {
       const entry = owned(exec), records = await entry.qualifications.list();
       const llm = ctx.get('llm'), providers = llm ? llm.listProviders().map(provider => provider.id) : [];
       return {enabled, build_id: BUILD_ID, approval_required: false, soft_target_usd: 1, hard_budget_cap: false,
-        routes: ROUTES.map(route => ({id: route.id, provider: route.provider, model: route.model, pools: [...route.pools], efforts: {...route.effortsExpected}, provider_registered: providers.includes(route.provider)})), qualifications: records};
+        routes: ROUTES.map(route => ({id: route.id, provider: route.provider, model: route.model, pools: [...route.pools],
+          // A reserve route is held back deliberately; it is not a broken or failed entry.
+          reserve: route.reserve, efforts: {...route.effortsExpected},
+          provider_registered: providers.includes(route.provider)})), qualifications: records};
     });
     register('orchestrator_qualify', 'Run one bounded real native-agent smoke probe for an exact route and effort, optionally adding image or structured-output capability probes and an operator attestation. Costs may be unknown; no approval or financial ceiling.',
       {route_id: {type: 'string', required: true}, effort: {type: 'string', required: true},
