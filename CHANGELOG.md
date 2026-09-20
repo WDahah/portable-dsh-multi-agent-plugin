@@ -4,6 +4,35 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.8.1
+
+Three gaps that only appeared once the loop ran against real models rather than stubs.
+
+### Fixed
+
+- **A reviewer answering only through the structured channel saved an empty answer.** The
+  verdict was stored, but the record read back with no text, and the review could never
+  itself be reviewed (`REVIEW_SUBJECT_EMPTY`). The verdict is now rendered as the saved
+  answer when the model supplies no text of its own. The parsed verdict remains the
+  authority; the rendering is a view of it.
+- **Deleting a run left any later review pointing at a record that no longer existed.**
+  `orchestrator_forget` now refuses with `ASSIGNMENT_REFERENCED_BY_REVIEW` and names the
+  reviews that block it. Cascading would destroy the review and clearing the link would
+  erase what it judged, so neither is done; `force: true` accepts a dangling reference
+  deliberately rather than silently.
+- **`VERDICT_UNREADABLE` did not say why.** A reviewer cut off by a token limit and one
+  that returned prose need opposite responses, and telling them apart meant reading the
+  review run separately. Each cycle now reports `reviewState` and an `unreadableCause` of
+  `REVIEWER_HIT_TOKEN_LIMIT`, `REVIEWER_RETURNED_NO_USABLE_VERDICT`, or
+  `REVIEWER_DID_NOT_COMPLETE`.
+
+### Note
+
+A reviewer needs room to think before it answers. A 2,048-token ceiling truncated a real
+reviewer before it emitted anything; the default of 16,384 was sufficient. The loop failed
+safe in that case — it reported no verdict rather than inferring one — but the cause was
+not visible, which is what the third fix addresses.
+
 ## 1.8.0
 
 ### Added

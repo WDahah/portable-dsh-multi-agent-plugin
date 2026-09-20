@@ -18,7 +18,7 @@ const REFUSAL_REASONS = new Set(['DISABLED', 'OWNER_REQUIRED', 'OWNER_CAPACITY',
   'PERSISTENCE_FAILED', 'INVALID_CHALLENGE', 'CHALLENGE_ALREADY_USED',
   'UNKNOWN_LIST_KIND', 'SPECIFY_EXACTLY_ONE_TARGET', 'QUALIFICATIONS_EXPIRED_OR_ALL',
   'INVALID_CYCLE_LIMIT', 'INVALID_OBJECTIVE', 'UNKNOWN_REVIEW_SUBJECT', 'REVIEW_SUBJECT_UNFINISHED',
-  'REVIEW_SUBJECT_EMPTY', 'CORRUPT_ASSIGNMENT']);
+  'REVIEW_SUBJECT_EMPTY', 'CORRUPT_ASSIGNMENT', 'ASSIGNMENT_REFERENCED_BY_REVIEW']);
 const refusalReason = error => typeof error?.code === 'string' && REFUSAL_REASONS.has(error.code) ? error.code : 'UNAVAILABLE';
 
 /** Inject the installed host's native defineTool; this package does not vendor DSH. */
@@ -151,7 +151,15 @@ export function createPlugin(defineTool) {
           cycles.push({cycle, review: reviewId, reviewedBy: `${review.provider}/${review.model}`,
             independent: review.independence?.independent ?? null,
             verdict: review.verdict?.verdict ?? null, verdictSource: review.verdict_source,
-            onObjective: review.verdict?.onObjective ?? null, decision: decision.state});
+            onObjective: review.verdict?.onObjective ?? null,
+            // Without the reviewer's own state, VERDICT_UNREADABLE cannot distinguish a
+            // model that wrote prose from one that was cut off, and those need opposite
+            // responses: reword the request, or raise max_tokens.
+            reviewState: review.state, decision: decision.state,
+            ...(decision.state === 'VERDICT_UNREADABLE'
+              ? {unreadableCause: review.state === 'PARTIAL' ? 'REVIEWER_HIT_TOKEN_LIMIT'
+                : review.state === 'COMPLETED' ? 'REVIEWER_RETURNED_NO_USABLE_VERDICT' : 'REVIEWER_DID_NOT_COMPLETE'}
+              : {})});
           if (!decision.continue) break;
           // Revise from the findings, not from a re-sent copy of the artifact: the reviser
           // reads the run under review, so only what must change travels forward.
@@ -256,11 +264,20 @@ export function createPlugin(defineTool) {
         return result;
       });
     register('orchestrator_forget', 'Permanently delete saved records this owner no longer needs. Prompts and outputs are stored in plaintext, so removal is the only way to clear them. In-flight work is refused, never deleted beneath itself.',
-      {run_id: {type: 'string'}, task_id: {type: 'string'}, qualifications: {type: 'string'}}, async (args, exec) => {
+      {run_id: {type: 'string'}, task_id: {type: 'string'}, qualifications: {type: 'string'}, force: {type: 'boolean'}}, async (args, exec) => {
         const entry = owned(exec), result = {};
         const wanted = ['run_id', 'task_id', 'qualifications'].filter(key => args[key] !== undefined);
         need(wanted.length === 1, 'SPECIFY_EXACTLY_ONE_TARGET');
-        if (args.run_id !== undefined) result.assignment = await entry.agents.forget(args.run_id);
+        if (args.run_id !== undefined) {
+          // Name what blocks the deletion, so the refusal is actionable rather than opaque.
+          if (args.force !== true) {
+            const referees = await entry.agents.referencedBy(args.run_id);
+            if (referees.length) return {status: 'BRIDGE_REFUSED_OR_FAILED', reason: 'ASSIGNMENT_REFERENCED_BY_REVIEW',
+              referenced_by: referees, hint: 'Delete those reviews first, or pass force:true to accept a dangling reference.',
+              details_redacted: true, automatic_retry: false};
+          }
+          result.assignment = await entry.agents.forget(args.run_id, {force: args.force === true});
+        }
         if (args.task_id !== undefined) result.task = await entry.engine.forget(args.task_id);
         if (args.qualifications !== undefined) {
           need(['expired', 'all'].includes(args.qualifications), 'QUALIFICATIONS_EXPIRED_OR_ALL');

@@ -45,7 +45,7 @@ test('forgetting an assignment removes only that record', async () => {
   const dispatcher = createAgentDispatcher({root: directory, owner, getSubagents: () => child('done')});
   await dispatcher.delegate({run_id: 'keep', prompt: 'x'}, route, 'medium', exec());
   await dispatcher.delegate({run_id: 'drop', prompt: 'y'}, route, 'medium', exec());
-  assert.deepEqual((await dispatcher.forget('drop')), {run_id: 'drop', removed: true});
+  assert.deepEqual((await dispatcher.forget('drop')), {run_id: 'drop', removed: true, forced: false});
   assert.deepEqual((await dispatcher.list()).map(e => e.run_id), ['keep']);
   await assert.rejects(dispatcher.read('drop'), error => error.code === 'UNKNOWN_ASSIGNMENT');
   await assert.rejects(dispatcher.forget('drop'), error => error.code === 'UNKNOWN_ASSIGNMENT');
@@ -65,7 +65,7 @@ test('a delegation in flight cannot be deleted beneath itself', async () => {
   await assert.rejects(dispatcher.forget('busy'), error => error.code === 'DELEGATION_BUSY');
   release();
   assert.equal((await running).state, 'COMPLETED');
-  assert.deepEqual(await dispatcher.forget('busy'), {run_id: 'busy', removed: true});
+  assert.deepEqual(await dispatcher.forget('busy'), {run_id: 'busy', removed: true, forced: false});
   dispatcher.dispose();
 });
 test('direct tasks list with their readable id, route and resumability', async () => {

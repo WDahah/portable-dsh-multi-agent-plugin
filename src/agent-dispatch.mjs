@@ -25,6 +25,17 @@ export function reviewMaterial(subject, {forRevision = false} = {}) {
     `Run: ${subject.run_id}\nProduced by: ${subject.provider}/${subject.model} at ${subject.effort} effort\n` +
     `${request}Its answer was:\n${subject.visibleText}\n${closing}`;
 }
+/** A readable rendering of a verdict that arrived only through the structured channel.
+ * Without it the decision is stored but the saved answer is empty, so the record cannot be
+ * read back or reviewed in turn. This is a view of the verdict, never a substitute for it:
+ * the parsed object remains the authority. */
+export function renderVerdict(verdict) {
+  const lines = [`Verdict: ${verdict.verdict}`, `On objective: ${verdict.onObjective}`, '', verdict.summary];
+  if (verdict.verified.length) lines.push('', 'Confirmed:', ...verdict.verified.map(v => `- ${v}`));
+  if (verdict.findings.length) lines.push('', 'Findings:', ...verdict.findings.map(f => `- [${f.severity}] ${f.detail}`));
+  if (verdict.clarifications.length) lines.push('', 'Needs clarification:', ...verdict.clarifications.map(c => `- ${c}`));
+  return lines.join('\n');
+}
 export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 900000}) {
   need(Number.isSafeInteger(deadlineMs) && deadlineMs > 0 && deadlineMs <= 900000, 'INVALID_DEADLINE');
   const store = createRecordStore(root, owner, 'assignments'), busy = new Set(), controllers = new Set();
@@ -121,15 +132,21 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
           persona: 'Complete only the delegated task within its explicit scope. Do not delegate. Report partial work accurately. Change only what the task asks for: every change should trace to the request.'});
         round.child_id = run.id; round.state = 'RUNNING'; await save();
         const result = await run.result;
-        const text = visibleOutput(result.output);
-        need(record.visibleText.length + text.length <= 262144, 'AGGREGATE_OUTPUT_BOUND');
-        const noProgress = index > 0 && (!text.trim() || record.visibleText.includes(text.trim()));
+        let text = visibleOutput(result.output);
         // A verdict is recorded exactly as declared. An unreadable one stays null so the
         // caller sees that none was given rather than a state nobody asserted.
         if (asking) {
           const declared = parseVerdict({structured: result.structured, output: text});
-          if (declared) {record.verdict = declared; record.verdict_source = declared.source;}
+          if (declared) {
+            record.verdict = declared; record.verdict_source = declared.source;
+            // A reviewer answering only through the structured channel would otherwise
+            // save an empty answer: the decision would be stored but unreadable, and the
+            // review could never itself be reviewed. Render the verdict as its answer.
+            if (!text.trim()) text = renderVerdict(declared);
+          }
         }
+        need(record.visibleText.length + text.length <= 262144, 'AGGREGATE_OUTPUT_BOUND');
+        const noProgress = index > 0 && (!text.trim() || record.visibleText.includes(text.trim()));
         round.text = text; round.state = result.stopReason;
         if (!noProgress) record.visibleText += text;
         record.state = scope.signal.aborted ? 'INTERRUPTED_UNKNOWN' : noProgress ? 'PARTIAL_NO_PROGRESS' : result.stopReason === 'completed' ? 'COMPLETED' : result.stopReason === 'max-tokens' ? 'PARTIAL' : 'INTERRUPTED_UNKNOWN';
@@ -247,14 +264,29 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
       .sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
   }
   /** Delete one saved assignment. A run in flight is refused rather than deleted beneath
-   * itself, so a forget cannot strand a dispatcher mid-write. */
-  async function forget(runId) {
+   * itself, and so is one a later review points at: a reviews link naming a record that no
+   * longer exists is a weaker audit trail than refusing the deletion. Cascading instead
+   * would destroy the review, and clearing the link would erase what it judged. */
+  async function forget(runId, {force = false} = {}) {
     const key = id(runId);
     need(!busy.has(key), 'DELEGATION_BUSY');
     const saved = await store.read(key); need(saved, 'UNKNOWN_ASSIGNMENT');
     need(saved.data?.owner === owner, 'OWNER_REFUSED');
+    if (!force) {
+      const referees = (await store.entries())
+        .map(entry => entry.data)
+        .filter(record => record?.owner === owner && record.reviews === runId)
+        .map(record => record.run_id);
+      need(referees.length === 0, 'ASSIGNMENT_REFERENCED_BY_REVIEW');
+    }
     await store.remove(key);
-    return {run_id: runId, removed: true};
+    return {run_id: runId, removed: true, forced: force === true};
   }
-  return {delegate, compact, read, list, forget, dispose() {disposed = true; for (const c of controllers) c.abort(new DOMException('Bridge disposed', 'AbortError'));}};
+  /** Which saved reviews point at this run. Reported so a refusal names what blocks it. */
+  async function referencedBy(runId) {
+    return (await store.entries()).map(entry => entry.data)
+      .filter(record => record?.owner === owner && record.reviews === runId)
+      .map(record => record.run_id);
+  }
+  return {delegate, compact, read, list, forget, referencedBy, dispose() {disposed = true; for (const c of controllers) c.abort(new DOMException('Bridge disposed', 'AbortError'));}};
 }
