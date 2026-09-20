@@ -80,7 +80,7 @@ Read-only, and the model is chosen for you:
 
 Read the result back later with `orchestrator_delegate_read({"run_id": "auth-inspect-001"})`. Implementation work uses the same shape with `write`/`edit` added and an explicit file scope.
 
-## The twelve tools
+## The thirteen tools
 
 | Tool | Purpose |
 |---|---|

@@ -4,6 +4,44 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.8.0
+
+### Added
+
+- **Declared verdicts.** A reviewer returns `verified`, `partial`, `failed`, or
+  `needs-clarification`, with `onObjective`, `findings`, `clarifications`, and the
+  acceptance criteria it actually confirmed. Where the host's spawn provider supports it
+  the shape is enforced by the host, so a usable verdict does not depend on a model
+  choosing to format JSON; `verdict_source` records which channel it arrived through.
+  Four states exist because a reviewer that can only pass or fail must guess when it lacks
+  information.
+- **`orchestrator_iterate` runs bounded revise cycles.** While the declared verdict asks
+  for more work, it reviews with a different provider where one is qualified, then revises
+  from the findings. The cap is 3, separate from and lower than the 8-round assignment
+  limit, because each cycle is a full model call. Revise cycles may write files when those
+  tools are allowed, and each records its own evidence link.
+- **Objectives travel as data.** An objective and its acceptance criteria are restated to
+  every child as fenced material, and drift is reported by the reviewer as
+  `onObjective: false` rather than inferred by comparing text.
+- **Optional compaction** on the economy pool, off by default, condenses a long artifact
+  between cycles. Measured saving: 9% at 3,000 characters, 16% at 12,000, 18% at 24,000.
+  It replaces working context only — the full revision stays readable and the final answer
+  is never a summary — and a compaction that is not genuinely smaller is refused.
+
+### Changed
+
+- A reviser is no longer sent a second copy of the request it is already given as an
+  objective, and no longer receives the verdict schema: reading the work it revises does
+  not make it a judge of that work.
+
+### Token cost
+
+A 3-cycle loop is 5 to 6 model calls, not 3. Measured against the same loop without these
+mechanisms, input falls from roughly 23,100 to 9,300 tokens, a **60% reduction**; with
+compaction on a 12,000-character artifact it falls further to about 14,100 from 16,800 on
+that larger input. An earlier planning estimate of "~19,500 to ~7,000" counted cycles
+rather than calls and was wrong; these figures are measured from the built loop.
+
 ## 1.7.0
 
 ### Added

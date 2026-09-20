@@ -2,7 +2,7 @@
 
 Use these tools **inside the compatible running DSH host**, after activation and fresh qualification in the same root agent session. Tool notation below is illustrative; invoke the actual registered tool, not a made-up shell command.
 
-## The twelve tools
+## The thirteen tools
 
 | Tool | Purpose |
 |---|---|
@@ -10,6 +10,7 @@ Use these tools **inside the compatible running DSH host**, after activation and
 | `orchestrator_qualify` | Real bounded child-agent text/tool challenge for exact `route_id` and `effort`, plus optional capability probes and an operator attestation |
 | `orchestrator_qualification_echo` | Internal active-challenge helper; no filesystem/network capability |
 | `orchestrator_capacity` | What can be dispatched right now, per pool, and the exact probe that would fix anything unusable |
+| `orchestrator_iterate` | Review a run and, while its declared verdict asks for more, run bounded revise cycles |
 | `orchestrator_delegate` | Select a qualified route and run a scoped native child agent, optionally reviewing an earlier run |
 | `orchestrator_delegate_read` | Read saved assignment output without restarting it |
 | `orchestrator_plan` | Select a qualified route and persist a direct-model task |
@@ -42,6 +43,59 @@ The reviewer is seeded with the subject's own request and answer, fenced as `UND
 **The reviewer prefers a different provider from the run it judges.** Today a fixed priority order would send both to the same model, so a review would share its subject's blind spots. When no alternative provider is qualified the review still proceeds, reporting `independence.independent: false` with a reason and a `REVIEW_SHARES_PROVIDER_WITH_SUBJECT` warning — visible in the record rather than passing as independent. Avoiding a provider never relaxes the evidence rules: an expired alternative is still refused.
 
 A review of an unknown, still-running, or empty subject is refused (`UNKNOWN_REVIEW_SUBJECT`, `REVIEW_SUBJECT_UNFINISHED`, `REVIEW_SUBJECT_EMPTY`). The relationship is stored on the assignment and shown by `orchestrator_list`.
+
+## Declared verdicts
+
+A reviewer returns a structured verdict, not prose. Where the host's spawn provider supports it the shape is **enforced by the host**, so a usable verdict does not depend on a model choosing to format JSON; otherwise the same contract is requested as text. `verdict_source` records which channel it arrived through.
+
+```json
+{"verdict": "verified | partial | failed | needs-clarification",
+ "onObjective": true,
+ "summary": "one sentence",
+ "findings": [{"severity": "blocker|major|minor|note", "detail": "..."}],
+ "clarifications": ["auth method not specified — email/password, SSO, OAuth?"],
+ "verified": ["compiles", "handles errors"]}
+```
+
+There are four states rather than two because a reviewer that can only pass or fail has to guess when it lacks information. `needs-clarification` is the honest alternative, and `clarifications` is where an unstated requirement is named instead of invented.
+
+**The plugin stores a verdict and never interprets it.** It reads the declared state to decide whether another cycle is permitted; it does not read prose to judge whether the work is acceptable.
+
+## Bounded revise loops
+
+`orchestrator_iterate` reviews a finished run and, while the declared verdict asks for more work, dispatches revise cycles:
+
+```json
+{"run_id": "auth-loop", "reviews": "auth-impl-001", "max_cycles": 3,
+ "objective": {"statement": "Add password reset", "acceptance": ["tests pass", "no new dependencies"]},
+ "allowed_tools": ["read", "write", "edit"]}
+```
+
+Each cycle reviews with a different provider where one is qualified, then revises from the findings. The loop stops on:
+
+| Stop | Meaning |
+|---|---|
+| `VERIFIED` | The reviewer verified the work |
+| `NEEDS_CLARIFICATION` | Returned to you; the task lacked information |
+| `UNCONVERGED` | Reached the cycle cap without a verified result — not "done" |
+| `VERDICT_UNREADABLE` | No usable verdict, so no state was inferred |
+| `REVISION_INCOMPLETE` | A revision did not finish cleanly and was not handed on |
+
+The cap is **3**, separate from and lower than the 8-round assignment limit, because each cycle is a full model call. Revise cycles **may write files** when you allow those tools; each records its own evidence link, so an unreviewed write is always identifiable.
+
+The `objective` travels to every child as fenced data, and the reviewer reports drift as `onObjective: false`. Drift is declared by the reviewer, never inferred by comparing text.
+
+## Compaction
+
+`compact: true` spends one cheap call on the economy pool to condense a long artifact between cycles. It is **off by default** and pays off as the artifact grows:
+
+| Artifact | Measured saving |
+|---|---|
+| 3,000 chars | 9% |
+| 12,000 chars | 16% |
+| 24,000 chars | 18% |
+
+Compaction is lossy, so it only ever replaces **working context**: the full revision stays readable through `orchestrator_delegate_read`, and the final answer is never a summary. A compaction that is not genuinely smaller is refused and reported rather than applied.
 
 ## Finding and clearing saved state
 
