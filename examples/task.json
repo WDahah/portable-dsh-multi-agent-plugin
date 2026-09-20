@@ -1,0 +1,9 @@
+{
+  "role": "R04",
+  "category": "implementation",
+  "risk": "low",
+  "complexity": "routine",
+  "escalate": false,
+  "dataClass": "internal",
+  "capabilities": ["text", "tools"]
+}

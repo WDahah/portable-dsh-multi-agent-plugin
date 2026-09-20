@@ -1,0 +1,12 @@
+# Machine-local generated imports, host paths, and patch files.
+.local/
+# Do not vendor a second copy of host Cordis/DSH dependencies.
+node_modules/
+# Local test outputs and credentials must never be distributed.
+tests/.tmp/
+coverage/
+*.log
+.env
+.env.*
+.DS_Store
+Thumbs.db

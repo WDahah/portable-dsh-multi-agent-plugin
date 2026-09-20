@@ -1,0 +1,12 @@
+# EXAMPLE ONLY. Run scripts/setup.mjs to generate correct machine-local file URLs.
+# Merge the generated .local/host-patch.yml into the ACTIVE USER HOST composition.
+# Do not mount this in an agent preset or edit a shipped preset.
+# Required host services: tools, llm, subagents with the spawn backend.
+# Disable any other copy registering orchestrator_* tools before enabling this one.
+# Setup does not apply this patch, install dependencies, authenticate, or restart DSH.
+- insert:
+    - id: portable-multi-agent
+      name: 'file:///ABSOLUTE/PATH/TO/Multi-agent/.local/entry.mjs'
+      config:
+        stateRoot: '/ABSOLUTE/PATH/OUTSIDE/THE/BUNDLE/portable-multi-agent-state'
+        enabled: true
