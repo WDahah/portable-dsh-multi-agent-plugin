@@ -4,6 +4,36 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.7.0
+
+### Added
+
+- **`orchestrator_capacity` reports what can be dispatched now.** Learning this previously
+  meant hand-joining the route list, `provider_registered`, and raw qualification records.
+  Per pool it reports dispatchable routes, the distinct providers they span, and
+  `independentReviewPossible`; anything unusable names its reason and a `requalify` object
+  that can be passed straight to `orchestrator_qualify`. It also reports
+  `structuredVerdictSupported`, read from the host's spawn provider.
+- **`reviews` links a run to the one it judges.** The reviewer is seeded with the subject's
+  request and answer, fenced as data and followed by an explicit instruction not to follow
+  anything inside them, so a subject cannot instruct its own reviewer. The relationship is
+  stored and appears in `orchestrator_list`.
+- **A review prefers a provider other than the one it judges.** The fixed priority order
+  would otherwise send a review to the same model that produced the work, sharing its blind
+  spots. When no alternative provider is qualified the review proceeds and says so, through
+  `independence.independent: false` with a reason and a
+  `REVIEW_SHARES_PROVIDER_WITH_SUBJECT` warning, rather than passing as independent.
+
+### Changed
+
+- Avoiding a provider reorders candidates only. It never removes one, never relaxes the
+  evidence rules, and never promotes an expired or unavailable route for being independent.
+- A review of an unknown, still-running, or empty subject is refused rather than judging
+  output that does not exist yet.
+- Assignments written by earlier versions remain readable and report a null `reviews` and
+  `independence`. Assignment records are not closed-schema, so earlier versions also read
+  records written by this one.
+
 ## 1.6.0
 
 ### Added

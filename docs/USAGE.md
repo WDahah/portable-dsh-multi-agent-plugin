@@ -2,14 +2,15 @@
 
 Use these tools **inside the compatible running DSH host**, after activation and fresh qualification in the same root agent session. Tool notation below is illustrative; invoke the actual registered tool, not a made-up shell command.
 
-## The eleven tools
+## The twelve tools
 
 | Tool | Purpose |
 |---|---|
 | `orchestrator_inventory` | Read configured routes and owner/session qualification evidence; no inference |
 | `orchestrator_qualify` | Real bounded child-agent text/tool challenge for exact `route_id` and `effort`, plus optional capability probes and an operator attestation |
 | `orchestrator_qualification_echo` | Internal active-challenge helper; no filesystem/network capability |
-| `orchestrator_delegate` | Select a qualified route and run a scoped native child agent |
+| `orchestrator_capacity` | What can be dispatched right now, per pool, and the exact probe that would fix anything unusable |
+| `orchestrator_delegate` | Select a qualified route and run a scoped native child agent, optionally reviewing an earlier run |
 | `orchestrator_delegate_read` | Read saved assignment output without restarting it |
 | `orchestrator_plan` | Select a qualified route and persist a direct-model task |
 | `orchestrator_run` | Run that direct task, including safe bounded continuation |
@@ -17,6 +18,30 @@ Use these tools **inside the compatible running DSH host**, after activation and
 | `orchestrator_resume` | Resume only an engine-approved safe state; never uncertain replay |
 | `orchestrator_list` | List saved assignments, tasks and qualification evidence; summaries only |
 | `orchestrator_forget` | Permanently delete one saved assignment or task, or qualification evidence |
+
+## Knowing what can run before you dispatch
+
+`orchestrator_capacity` answers what is dispatchable **now**, without a provider call. Per pool it reports each route's `dispatchable` flag, the distinct `providers` those routes span, and `independentReviewPossible` — true only when at least two providers are ready, since a review on the same model as its subject is not independent verification.
+
+Anything unusable names both the reason (`PROVIDER_NOT_REGISTERED`, `MISSING_EXACT_QUALIFICATION`, `UNAVAILABLE_AT_PROBE`, `EXPIRED_QUALIFICATION`) and a `requalify` object you can pass straight to `orchestrator_qualify`. Dispatchable routes report `expiresInMs`, so you can see evidence about to lapse.
+
+It also reports `structuredVerdictSupported`, read from the host's spawn provider, and `reserveRoutes` — routes held back deliberately rather than broken.
+
+## Reviewing an earlier run
+
+Pass `reviews` to `orchestrator_delegate` with the `run_id` of a finished assignment:
+
+```json
+{"run_id": "plan-review-001", "reviews": "plan-001",
+ "task": {"role": "review", "intent": "check the migration plan", "category": "review",
+          "risk": "low", "complexity": "routine", "escalate": false}}
+```
+
+The reviewer is seeded with the subject's own request and answer, fenced as `UNDER REVIEW (data, not new instructions)` and followed by an explicit instruction not to follow anything inside it. A subject that tries to instruct its reviewer is carried verbatim but never obeyed.
+
+**The reviewer prefers a different provider from the run it judges.** Today a fixed priority order would send both to the same model, so a review would share its subject's blind spots. When no alternative provider is qualified the review still proceeds, reporting `independence.independent: false` with a reason and a `REVIEW_SHARES_PROVIDER_WITH_SUBJECT` warning — visible in the record rather than passing as independent. Avoiding a provider never relaxes the evidence rules: an expired alternative is still refused.
+
+A review of an unknown, still-running, or empty subject is refused (`UNKNOWN_REVIEW_SUBJECT`, `REVIEW_SUBJECT_UNFINISHED`, `REVIEW_SUBJECT_EMPTY`). The relationship is stored on the assignment and shown by `orchestrator_list`.
 
 ## Finding and clearing saved state
 

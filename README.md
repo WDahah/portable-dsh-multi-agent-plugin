@@ -80,7 +80,7 @@ Read-only, and the model is chosen for you:
 
 Read the result back later with `orchestrator_delegate_read({"run_id": "auth-inspect-001"})`. Implementation work uses the same shape with `write`/`edit` added and an explicit file scope.
 
-## The eleven tools
+## The twelve tools
 
 | Tool | Purpose |
 |---|---|
@@ -91,6 +91,7 @@ Read the result back later with `orchestrator_delegate_read({"run_id": "auth-ins
 | `orchestrator_plan` / `orchestrator_run` | Persist and run a direct model task with bounded continuation |
 | `orchestrator_read` | Saved output, route, prompt and accounting |
 | `orchestrator_resume` | Resume only a settled, safe state; never an uncertain replay |
+| `orchestrator_capacity` | What can be dispatched now, per pool, and the probe that would fix anything unusable |
 | `orchestrator_list` | Find saved assignments, tasks and evidence; summaries only |
 | `orchestrator_forget` | Permanently delete a saved record or lapsed evidence |
 | `orchestrator_qualification_echo` | Internal probe helper; no filesystem or network access |

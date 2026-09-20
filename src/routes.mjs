@@ -138,12 +138,23 @@ function roleView(policy, task) {
 }
 /** Input records are detached data read by the plugin from its private journal, NEVER tool arguments.
  * Schema/provenance labels are not authentication or cryptographic proof. */
-export function selectRoute({task, qualifications, now = Date.now()} = {}) {
+export function selectRoute({task, qualifications, now = Date.now(), avoidProvider} = {}) {
   const policy = taskPolicy(task);
   const base = {policyVersion: POLICY_VERSION, softTargetUsd: 1, financialFilter: false, qualificationLevel: 'smoke'};
   if (!policy || !Array.isArray(qualifications) || !integer(now)) return {...base, status: 'UNAVAILABLE', reason: 'INVALID_INPUT', reasons: []};
   const reasons = [];
-  for (const id of POOL_PRIORITY[policy.pool]) {
+  // A review of a run should not land on the model that produced it: same model, same
+  // blind spots. Candidates from another provider are tried first, but nothing is removed
+  // — an unavoidable same-provider review proceeds and says so rather than refusing.
+  const candidates = [...POOL_PRIORITY[policy.pool]];
+  if (typeof avoidProvider === 'string' && avoidProvider) {
+    candidates.sort((a, b) => {
+      const sameA = ROUTES.find(r => r.id === a)?.provider === avoidProvider ? 1 : 0;
+      const sameB = ROUTES.find(r => r.id === b)?.provider === avoidProvider ? 1 : 0;
+      return sameA - sameB;
+    });
+  }
+  for (const id of candidates) {
     const route = ROUTES.find(r => r.id === id), effort = expectedEffort(route, policy.pool);
     const matching = qualifications.filter(q => q && q.provider === route.provider && q.model === route.model && q.effort === effort);
     if (!matching.length) {
@@ -189,8 +200,20 @@ export function selectRoute({task, qualifications, now = Date.now()} = {}) {
     };
     const warnings = ['SMOKE_IS_NOT_ROLE_COMPETENCE_CERTIFICATION', 'MODEL_STRING_IS_NOT_IMMUTABLE_BACKEND_IDENTITY'];
     if (policy.role.deprecated) warnings.push('DEPRECATED_ROLE_CODE');
+    // Independence is reported whenever a provider was to be avoided, so a same-provider
+    // review is visible in the record rather than passing as an independent one.
+    let independence;
+    if (typeof avoidProvider === 'string' && avoidProvider) {
+      const alternatives = candidates.filter(id => ROUTES.find(r => r.id === id)?.provider !== avoidProvider);
+      independence = route.provider === avoidProvider
+        ? {independent: false, reason: alternatives.length ? 'NO_QUALIFIED_ALTERNATIVE_PROVIDER' : 'NO_ALTERNATIVE_PROVIDER_IN_POOL',
+           avoidedProvider: avoidProvider, alternativesConsidered: alternatives}
+        : {independent: true, avoidedProvider: avoidProvider, alternativesConsidered: alternatives};
+      if (!independence.independent) warnings.push('REVIEW_SHARES_PROVIDER_WITH_SUBJECT');
+    }
     return {...base, status: 'SELECTED', route, effort, pool: policy.pool, reason: policy.reason,
-      ...roleView(policy, task), qualification: evidence, warnings, reasons};
+      ...roleView(policy, task), qualification: evidence,
+      ...(independence ? {independence} : {}), warnings, reasons};
   }
   return {...base, status: 'UNAVAILABLE', pool: policy.pool, reason: 'NO_QUALIFIED_ROUTE_IN_POOL', ...roleView(policy, task), reasons};
 }
