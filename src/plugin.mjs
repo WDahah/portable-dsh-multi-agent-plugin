@@ -76,7 +76,9 @@ export function createPlugin(defineTool) {
         need(enabled, 'DISABLED'); const {entry, selected} = await choose(args, exec); if (selected.status !== 'SELECTED') return selected;
         const maxTokens = args.max_tokens ?? 32768; need(Number.isInteger(maxTokens) && maxTokens >= 64 && maxTokens <= 65536, 'INVALID_MAX_TOKENS');
         const route = selected.route, planned = {task_id: args.task_id, prompt: args.prompt,
-          route: {provider: route.provider, model: route.model, effort: selected.effort, maxTokens}, maxRounds: args.max_rounds ?? 3, contextChars: args.context_chars ?? 160000};
+          route: {provider: route.provider, model: route.model, effort: selected.effort, maxTokens},
+          // Record the evidence that authorized this selection alongside the task.
+          evidence: selected.qualification, maxRounds: args.max_rounds ?? 3, contextChars: args.context_chars ?? 160000};
         planned.route.costRates = route.pricing ? {inputMicrosPerMillion: Math.round(route.pricing.inputPerMillion * 1000000), outputMicrosPerMillion: Math.round(route.pricing.outputPerMillion * 1000000)} : null;
         return {selection: selected, task: await entry.engine.plan(planned)};
       });
@@ -89,7 +91,7 @@ export function createPlugin(defineTool) {
     register('orchestrator_delegate', 'Select a qualified route and run a real scoped child agent. Automatic new-child continuation is restricted to readonly tool sets; no error retry.',
       {...task, run_id: {type: 'string', required: true}, prompt: {type: 'string', required: true}, allowed_tools: {type: 'array', items: {type: 'string'}}, max_rounds: {type: 'integer'}, max_tokens: {type: 'integer'}}, async (args, exec) => {
         need(enabled, 'DISABLED'); const {entry, selected} = await choose(args, exec); if (selected.status !== 'SELECTED') return selected;
-        return {selection: selected, delegation: await entry.agents.delegate({...args, role: args.task.role}, selected.route, selected.effort, exec)};
+        return {selection: selected, delegation: await entry.agents.delegate({...args, role: args.task.role, evidence: selected.qualification}, selected.route, selected.effort, exec)};
       }, 910000);
     register('orchestrator_delegate_read', 'Read immutable child-assignment output; never restarts the child.',
       {run_id: {type: 'string', required: true}, offset: {type: 'integer'}}, (args, exec) => owned(exec).agents.read(args.run_id, args.offset ?? 0));

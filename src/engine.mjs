@@ -2,6 +2,7 @@ import {randomUUID} from 'node:crypto';
 import fsp from 'node:fs/promises';
 import path from 'node:path';
 import {createJournal, diskId, digest, need, normalizeRequest, normalizeUsage, MAX_VISIBLE} from './journal.mjs';
+import {normalizeEvidence} from './qualification.mjs';
 
 export const HARD_MS=900000;
 const CONTINUE='Continue from your previous answer without repeating it. Complete the original request.';
@@ -37,6 +38,9 @@ export function createTaskEngine({root,owner,getLlm,clock=Date.now,deadlineMs=HA
     // The original request travels with the result so a saved task can be audited for
     // what was asked, not only for what the model returned.
     prompt:r.request.prompt,
+    // A task planned before evidence was linked reports null rather than a fabricated
+    // link, and says so through evidenceRecorded.
+    evidence:r.evidence??null,evidenceRecorded:r.evidence!=null,
     diagnosticPersisted:false,diagnostics:diagnosticView(r)};}
   async function save(r,status,emergency=false){const d=diagnostics.get(r)?.at(-1),previous=d?.phase;if(d)d.phase='checkpoint';need(!r.persistenceFailed,'PERSISTENCE_FAILED');need(r.revision<(emergency?1024:1023),'REVISION_LIMIT');r.status=status;account(r);const {persistenceFailed,...owned}=r;try{const saved=await journal.save(r.task,{...owned,revision:r.revision+1},r.revision);Object.assign(r,saved);if(d)d.phase=previous;}catch(error){r.persistenceFailed=true;throw error;}}
   async function load(id){checkId(id);if(loaded.has(id))return loaded.get(id);need(loaded.size<64,'TASK_CAPACITY');const r=await journal.load(diskId(id));need(r,'UNKNOWN_TASK');if(loaded.has(id))return loaded.get(id);loaded.set(id,r);return r;}
@@ -68,10 +72,15 @@ export function createTaskEngine({root,owner,getLlm,clock=Date.now,deadlineMs=HA
       await fsp.writeFile(indexFile(),JSON.stringify(index),{encoding:'utf8',mode:0o600});
     }catch{ /* Losing a hint is harmless once the record itself is gone. */ }
   }
-  async function plan({task_id,prompt,route,maxRounds=3,contextChars=160000,deadlineMs:taskMs=deadlineMs}){return exclusive(task_id,async()=>{
+  async function plan({task_id,prompt,route,evidence,maxRounds=3,contextChars=160000,deadlineMs:taskMs=deadlineMs}){return exclusive(task_id,async()=>{
     need(!disposed,'DISPOSED');need(!loaded.has(task_id)&&loaded.size<64,'TASK_EXISTS_OR_CAPACITY');need(!(await journal.load(diskId(task_id))),'TASK_EXISTS');need(integer(taskMs)&&taskMs>0&&taskMs<=deadlineMs,'INVALID_DEADLINE');
     const createdAt=clock();const request=normalizeRequest({prompt,route,maxRounds,contextChars,createdAt,deadlineAt:createdAt+taskMs});
-    const r={version:3,owner:diskId(owner),task:diskId(task_id),revision:0,status:'PLANNED',request,requestHash:digest(JSON.stringify(request)),rounds:[],spentMicros:0,heldMicros:0,costUnknown:false};loaded.set(task_id,r);await save(r,'PLANNED');await noteId(task_id);return view(task_id,r);
+    // Evidence is fixed at plan time: it records what authorized this task, and the
+    // journal refuses any later change to it.
+    const authorized=normalizeEvidence(evidence);
+    const r={version:3,owner:diskId(owner),task:diskId(task_id),revision:0,status:'PLANNED',request,requestHash:digest(JSON.stringify(request)),rounds:[],spentMicros:0,heldMicros:0,costUnknown:false};
+    if(authorized)r.evidence=authorized;
+    loaded.set(task_id,r);await save(r,'PLANNED');await noteId(task_id);return view(task_id,r);
   });}
   async function run(id,exec){caller(exec);return exclusive(id,async()=>{
     const r=await load(id);caller(exec);need(!r.persistenceFailed,'PERSISTENCE_FAILED');
@@ -149,6 +158,7 @@ export function createTaskEngine({root,owner,getLlm,clock=Date.now,deadlineMs=HA
       createdAt:record?record.request.createdAt:null,deadlineAt:record?record.request.deadlineAt:null,
       totalChars:record?record.rounds.reduce((n,x)=>n+x.visibleText.length,0):0,
       resumable:record?SAFE.includes(record.status)&&clock()<record.request.deadlineAt:false,
+      evidenceId:record?.evidence?.evidenceId??null,evidenceRecorded:record?.evidence!=null,
     })).sort((a,b)=>(b.createdAt??0)-(a.createdAt??0));
   }
   /** Delete one saved task. A task currently running is refused rather than deleted

@@ -75,6 +75,16 @@ Every result attributes its work to an exact route. A delegated assignment repor
 
 Each round also carries `route_recorded_per_round` (`routeRecordedPerRound` for direct tasks). When it is `false`, that round predates per-round routes and the reported model comes from the task's route rather than from a value stored with the round. A stored round route must match the route its task planned, so an edited journal cannot attribute a round to a model that never ran it.
 
+## Knowing what authorized a run
+
+A saved record names the evidence that permitted it, not only the model that answered. Delegations report `evidence` with `evidence_recorded`; direct tasks report `evidence` with `evidenceRecorded`; both listings carry the evidence id.
+
+The `evidence` block holds `evidenceId`, the evidence's own `issuedAt`/`expiresAt`, the passed `caseResults`, `allowedDataClasses`, `domainEvidence`, `imagePassed`, and `attestedBy` when an operator attestation widened policy. Together these answer which model ran, on what evidence, at what effort, and on whose statement.
+
+`evidenceId` is **derived from the evidence**, not assigned, so a link can be rechecked rather than trusted: recomputing it from the qualification a record names must reproduce the stored id. For a direct task the evidence is fixed at plan time and the journal refuses any later change (`EVIDENCE_MUTATED`), so a run cannot be made to look authorized after the fact.
+
+A record written before this linkage existed reports `evidence: null` with a false `evidence_recorded`, rather than a fabricated link.
+
 ## When a route is refused
 
 An `UNAVAILABLE` selection lists one entry per candidate route, and each entry carries a `requalify` object holding the exact `orchestrator_qualify` arguments that would resolve it — including `capabilities` for a probe-backed requirement and an `attestation` skeleton for domain or data-class policy, which no probe can grant. An `EXPIRED_QUALIFICATION` entry also reports `expiredAt` and `expiredForMs`.

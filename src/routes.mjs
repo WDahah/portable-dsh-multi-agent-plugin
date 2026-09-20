@@ -1,4 +1,6 @@
 // Runtime overlay, not an amendment to the historical API catalog.
+import {evidenceIdOf} from './qualification.mjs';
+
 export const POLICY_VERSION = 'orchestration-v3-routes-1';
 const freeze = value => {
   if (value && typeof value === 'object') {
@@ -140,8 +142,18 @@ export function selectRoute({task, qualifications, now = Date.now()} = {}) {
       if (reason === 'DATA_CLASS_NOT_QUALIFIED') entry.requalify.attestation = {dataClasses: [...BASE_DATA_CLASSES, task.dataClass ?? 'public'], attestedBy: '<who reviewed this>', basis: '<what you reviewed or ran>'};
       reasons.push(entry); continue;
     }
+    // The evidence that authorized this selection travels with it, so the run it starts
+    // can record what permitted it rather than only which model answered.
+    const evidence = {
+      evidenceId: evidenceIdOf(latest[0]), issuedAt: latest[0].issuedAt, expiresAt: latest[0].expiresAt,
+      runtimeBuildId: latest[0].runtimeBuildId, adapterFingerprint: latest[0].adapterFingerprint,
+      domainEvidence: latest[0].domainEvidence, imagePassed: latest[0].imagePassed === true,
+      allowedDataClasses: [...latest[0].allowedDataClasses],
+      caseResults: latest[0].caseResults.filter(c => c?.passed === true).map(c => c.name),
+      attestedBy: latest[0].attestation?.attestedBy ?? null,
+    };
     return {...base, status: 'SELECTED', route, effort, pool: policy.pool, reason: policy.reason,
-      qualification: {issuedAt: latest[0].issuedAt, expiresAt: latest[0].expiresAt, runtimeBuildId: latest[0].runtimeBuildId, adapterFingerprint: latest[0].adapterFingerprint, domainEvidence: latest[0].domainEvidence},
+      qualification: evidence,
       warnings: ['SMOKE_IS_NOT_ROLE_COMPETENCE_CERTIFICATION', 'MODEL_STRING_IS_NOT_IMMUTABLE_BACKEND_IDENTITY'], reasons};
   }
   return {...base, status: 'UNAVAILABLE', pool: policy.pool, reason: 'NO_QUALIFIED_ROUTE_IN_POOL', reasons};
