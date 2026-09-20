@@ -4,6 +4,16 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.1.1
+
+### Fixed
+
+- A probe test failed intermittently, roughly once in fifty runs. Its "blind guess" case
+  named a fixed pair of colors while the image probe chooses its panels at random, so the
+  guess was occasionally correct and the assertion that guessing must fail did not hold.
+  The case now guesses colors the probe demonstrably did not use. No source behavior
+  changed: this was the test coinciding with the very odds the probe is built around.
+
 ## 1.1.0
 
 ### Fixed

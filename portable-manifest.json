@@ -15,7 +15,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "ba921ccfe204684e63eba664c6fbcf16559e50146285e5c202c102ca2a4994f4"
+      "sha256": "c10cd09e772abff7260a1a1cfb193d8771572590d2cfa66a3633ffbc64a5816d"
     },
     {
       "path": "CONTRIBUTING.md",
@@ -71,7 +71,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "c20772a477f0aaadf640208dba42cbbba4473c5d770c92918baec5022bf327ce"
+      "sha256": "ee2d5e4a1d63767b3151f1225e5dff4ff35bb572c570e5c5b64431919b5980dc"
     },
     {
       "path": "scripts/doctor.mjs",
@@ -143,7 +143,7 @@
     },
     {
       "path": "tests/probes.test.mjs",
-      "sha256": "f57a5099c996b09cc694e8b0fe5b8c68952a345b2a6b4ad88154143768f85b86"
+      "sha256": "b6ffe33828e1e7e70de88ac7d766faa7be09f0f3e9ce0ce838a9ff24a58118a9"
     },
     {
       "path": "tests/routes.test.mjs",

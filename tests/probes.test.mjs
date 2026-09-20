@@ -36,7 +36,12 @@ function childFactory(mode, getManager) {
       assert.deepEqual(request.toolFilter, {allow: []});
       const names = request.prompt.filter(p => p.type === 'image').map(p => /probe-(\w+)\.png/.exec(p.attachment.attachmentId)[1]);
       assert.equal(names.length, IMAGE_PROBE_PANELS);
-      const answer = mode === 'blind' ? 'IMAGE:' + PROBE_COLORS.slice(0, IMAGE_PROBE_PANELS).map(c => c.name).join(':')
+      // A blind guess must be a guess that is actually wrong: naming fixed colors would
+      // coincide with the randomly chosen panels about once every few dozen runs and
+      // fail this test for the same reason the probe exists.
+      const guess = PROBE_COLORS.map(c => c.name).filter(name => !names.includes(name)).slice(0, IMAGE_PROBE_PANELS);
+      assert.equal(guess.length, IMAGE_PROBE_PANELS);
+      const answer = mode === 'blind' ? 'IMAGE:' + guess.join(':')
         : mode === 'refuse' ? 'I am unable to view images.' : 'IMAGE:' + names.join(':');
       return {id: 'synthetic-image-child', result: Promise.resolve(text(answer)), async dispose() {}};
     }
