@@ -4,6 +4,19 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.9.2
+
+### Fixed
+
+- **Two formatting blemishes in the demo**, spotted in a pasted transcript. One override
+  row was longer than the fixed padding width, so its arrow jutted out of the column, and
+  the objective block stacked three blank lines because that material already begins with
+  its own separator. The demo is the first thing most readers see, and ragged output
+  undercuts a project whose argument is that it is careful about detail.
+- Column widths are now derived from the longest entry rather than hard-coded, so adding a
+  case later cannot silently misalign a table. A test rejects trailing whitespace, stacked
+  blank lines, and misaligned columns in the demo output.
+
 ## 1.9.1
 
 ### Fixed

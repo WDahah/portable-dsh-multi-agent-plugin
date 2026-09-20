@@ -84,6 +84,23 @@ test('the quickstart commands parse in every common shell', async () => {
     }
   }
 });
+test('the demo is tidy enough to paste into a bug report or a post', async () => {
+  // This output is the first thing most readers see, and ragged formatting undercuts a
+  // project whose argument is that it is careful about detail.
+  const output = await exec();
+  const lines = output.split('\n');
+  assert.deepEqual(lines.filter(line => /\s$/.test(line)), [], 'trailing whitespace');
+  assert.equal(/\n\n\n/.test(output), false, 'stacked blank lines');
+  // Columns that pad to a fixed width silently misalign when a longer case is added.
+  const columns = lines.filter(line => line.includes(' -> ')).map(line => line.indexOf(' -> '));
+  for (const group of [columns.slice(0, 5)]) {
+    assert.equal(new Set(group).size, 1, 'the role table lost its column alignment');
+  }
+  const overrides = lines.filter(line => line.trim().startsWith('standard + '));
+  assert.equal(overrides.length, 3);
+  assert.equal(new Set(overrides.map(line => line.indexOf(' -> '))).size, 1,
+    'the override table lost its column alignment');
+});
 test('output is clean when piped, so it can be pasted or logged', async () => {
   // execFile gives a non-TTY stdout, which is the condition colour must switch off under.
   const output = (await run(process.execPath, [demo], {env: {...process.env, NO_COLOR: ''}})).stdout;

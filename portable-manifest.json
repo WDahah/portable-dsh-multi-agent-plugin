@@ -31,7 +31,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "c65bf1d448fd19f65592611ce3e3806a9ccbbe656c15c9b13ab931bf5e540e85"
+      "sha256": "4ebdf07b161d8afde69c1e840ec5773fa7fadc1fa27426ecbba0dc75753d124b"
     },
     {
       "path": "CODE_OF_CONDUCT.md",
@@ -67,7 +67,7 @@
     },
     {
       "path": "demo.mjs",
-      "sha256": "c111102de57c101a6ffe879959f9854e53f868101efe75077aa2cde1913a9c2e"
+      "sha256": "fd068baf0ed95e412375108bfe1885dc686139b54ddd965520533e010bd95dfe"
     },
     {
       "path": "docs/ARCHITECTURE.md",
@@ -99,7 +99,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "f5b6032ca2816c7b3cd1cc6ae3c73423dd052587da17b1dab374f3bfaa5a610d"
+      "sha256": "2c7f6f4042f50d627dbfd400cfc3d207b30bd33014da314e1774fcda698d5974"
     },
     {
       "path": "scripts/doctor.mjs",
@@ -167,7 +167,7 @@
     },
     {
       "path": "tests/demo.test.mjs",
-      "sha256": "d2ec7adf3a08bb8dfb27c9f15398dd30ac4f7e9a9dc0111154c43c5677159c4a"
+      "sha256": "1a22a6f0c1aad4fc08b54dd553ccc1f7634703b192ad3840775180390ed53090"
     },
     {
       "path": "tests/diagnostic.test.mjs",
