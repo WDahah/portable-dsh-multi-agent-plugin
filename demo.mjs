@@ -68,9 +68,12 @@ const scenes = {
       }
     }
     console.log(`\n  ${dim('Risk and complexity override the role:')}`);
-    for (const override of [{risk: 'high'}, {complexity: 'complex'}, {escalate: true}]) {
+    const overrides = [{risk: 'high'}, {complexity: 'complex'}, {escalate: true}];
+    // Width comes from the longest entry, so adding a case later cannot misalign the column.
+    const width = Math.max(...overrides.map(override => JSON.stringify(override).length));
+    for (const override of overrides) {
       const result = selectRoute({task: task({role: 'standard', ...override}), qualifications: evidence, now: NOW});
-      console.log(`  standard + ${JSON.stringify(override).padEnd(22)} -> ${result.pool}`);
+      console.log(`  standard + ${JSON.stringify(override).padEnd(width)} -> ${result.pool}`);
     }
   },
   refusal() {
@@ -158,7 +161,10 @@ const scenes = {
     scene('6. The objective travels as data',
       'Every child is handed the objective again, fenced so it reads as material rather\nthan as fresh instructions. Drift is something the reviewer reports, not something\nthe plugin infers by comparing text.');
     const objective = normalizeObjective({statement: 'Add password reset', acceptance: ['tests pass', 'no new dependencies']});
-    console.log(objectiveMaterial(objective).split('\n').map(line => '  ' + line).join('\n'));
+    // objectiveMaterial opens with blank lines that separate it from a prompt; here the
+    // scene heading already did that, so they are trimmed rather than stacked.
+    console.log(objectiveMaterial(objective).trim().split('\n')
+      .map(line => (line ? '  ' + line : '')).join('\n'));
     const drifted = parseVerdict({structured: {verdict: 'failed', onObjective: false,
       summary: 'Implemented account deletion instead.', findings: [{severity: 'blocker', detail: 'Solved a different problem.'}]}});
     console.log(`\n  reviewer reports onObjective=${red(String(drifted.onObjective))} -> ${drifted.summary}`);
