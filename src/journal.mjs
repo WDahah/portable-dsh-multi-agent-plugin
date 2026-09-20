@@ -11,6 +11,14 @@ export const diskId = value => 'x' + digest(value).slice(0,63);
 export function need(ok, code = 'INVALID_RECORD') {if (!ok) throw Object.assign(new Error(code), {code});}
 const integer = n => Number.isSafeInteger(n) && n >= 0;
 const exact = (o, keys) => need(o && typeof o === 'object' && !Array.isArray(o) && Reflect.ownKeys(o).length === keys.length && keys.every(k => Object.hasOwn(o,k)), 'CLOSED_SCHEMA');
+/** Closed schema with a known optional tail: every required key must be present, and no
+ * key outside required+optional may appear. Records written before an optional field
+ * existed stay valid, so an older journal is readable rather than reported as corrupt. */
+const closed = (o, required, optional) => {
+  need(o && typeof o === 'object' && !Array.isArray(o), 'CLOSED_SCHEMA');
+  const keys = Reflect.ownKeys(o);
+  need(required.every(k => Object.hasOwn(o,k)) && keys.every(k => required.includes(k) || optional.includes(k)), 'CLOSED_SCHEMA');
+};
 const id = v => {need(typeof v === 'string' && /^x[a-f0-9]{63}$/.test(v), 'INVALID_ID'); return v;};
 export function normalizeRoute(r) {
   need(r && typeof r === 'object' && !Array.isArray(r), 'INVALID_ROUTE');
@@ -58,7 +66,7 @@ function normalizeRecord(r, owner, task, revision) {
   need(Array.isArray(r.rounds) && r.rounds.length <= request.maxRounds, 'INVALID_ROUNDS');
   const ids = new Set(); let chars = 0, spent = 0, held = 0, unknown = false;
   const rounds = r.rounds.map((v,i) => {
-    exact(v,['attemptId','status','visibleText','finish','usage','costMicros','holdMicros']);
+    closed(v,['attemptId','status','visibleText','finish','usage','costMicros','holdMicros'],['route']);
     need(typeof v.attemptId === 'string' && /^[a-f0-9-]{36}$/.test(v.attemptId) && !ids.has(v.attemptId), 'INVALID_ATTEMPT'); ids.add(v.attemptId);
     need(['ATTEMPT_COMMITTED','RUNNING','COMPLETED','INTERRUPTED_UNCERTAIN'].includes(v.status), 'INVALID_ROUND_STATUS');
     need(i === r.rounds.length-1 || v.status === 'COMPLETED', 'UNSETTLED_PREVIOUS_ROUND');
@@ -72,7 +80,15 @@ function normalizeRecord(r, owner, task, revision) {
     }
     if (v.status !== 'COMPLETED') need(v.costMicros===null&&v.holdMicros===expectedHold(request,r.rounds.slice(0,i)), 'UNSETTLED_COST');
     spent += v.costMicros ?? 0; held += v.holdMicros ?? 0; unknown ||= v.costMicros === null;
-    return {attemptId:v.attemptId,status:v.status,visibleText:v.visibleText,finish:v.finish,usage,costMicros:v.costMicros,holdMicros:v.holdMicros};
+    const round = {attemptId:v.attemptId,status:v.status,visibleText:v.visibleText,finish:v.finish,usage,costMicros:v.costMicros,holdMicros:v.holdMicros};
+    // A recorded round route must name the route this task actually planned, so an edited
+    // journal cannot attribute a round to a model that never ran it.
+    if (v.route !== undefined) {
+      exact(v.route,['provider','model','effort']);
+      need(v.route.provider===request.route.provider&&v.route.model===request.route.model&&v.route.effort===request.route.effort,'ROUND_ROUTE_MISMATCH');
+      round.route = {provider:v.route.provider,model:v.route.model,effort:v.route.effort};
+    }
+    return round;
   });
   need(integer(spent) && integer(held) && r.spentMicros === spent && r.heldMicros === held && r.costUnknown === unknown, 'LEDGER_MISMATCH');
   if (r.status === 'PLANNED') need(rounds.length === 0, 'INVALID_STATE');

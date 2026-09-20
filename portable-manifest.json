@@ -15,7 +15,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "c10cd09e772abff7260a1a1cfb193d8771572590d2cfa66a3633ffbc64a5816d"
+      "sha256": "a92b0decf16cc5fdcf59162ba3131c96c20818fa01430e953b0619555590bc49"
     },
     {
       "path": "CONTRIBUTING.md",
@@ -55,7 +55,7 @@
     },
     {
       "path": "docs/USAGE.md",
-      "sha256": "8c0a85085ffdafaa93be36954263949179e4a83b3381176b67463c2bd2eb9733"
+      "sha256": "c7402830c7507f1b44461da8e8a8988f6e778c1e8593fee5cd4037a0117ae714"
     },
     {
       "path": "examples/PROJECT-PROMPT.md",
@@ -71,7 +71,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "ee2d5e4a1d63767b3151f1225e5dff4ff35bb572c570e5c5b64431919b5980dc"
+      "sha256": "2e14704ba0d355e203945a5c1c96b15c120229d713153da644d75053ceff6453"
     },
     {
       "path": "scripts/doctor.mjs",
@@ -91,7 +91,7 @@
     },
     {
       "path": "src/agent-dispatch.mjs",
-      "sha256": "06df9fc5c73286d1c826068939e081583f659608ed552614a2cbdbd27f98adaa"
+      "sha256": "8b0305d98d52c5144c7ba4e64610670840dd5c26d4bba3b2d278d832a6dbe93a"
     },
     {
       "path": "src/cancellation.mjs",
@@ -99,11 +99,11 @@
     },
     {
       "path": "src/engine.mjs",
-      "sha256": "2f04863eb81f5f2ee46dc8f75ea470c376317c7171409735fa4f411a6941a846"
+      "sha256": "36894670e3bcdfca73510306ad083ae3bf64cc1dfbe8be888e4a49a57ab51d19"
     },
     {
       "path": "src/journal.mjs",
-      "sha256": "6edc5677d83181351eb7b305dc0721d17ddd50a22f5d65b11611527af1b16771"
+      "sha256": "3c30a592b02b7642c3c4f2c9469d25d2cd5a463161c3fb02209afe3842b0dbc6"
     },
     {
       "path": "src/plugin.mjs",
@@ -115,11 +115,15 @@
     },
     {
       "path": "src/qualification.mjs",
-      "sha256": "04a8ad1a160791c165efe3971bbfaf3fd177b31f49a48dd77f492f0dca66678b"
+      "sha256": "35b5655e1709f7bab5cb28907f93ad27bfad0ff6dce9d991bbc8308766286721"
     },
     {
       "path": "src/routes.mjs",
       "sha256": "7abe3970cc1766da38e2bf4b676e0254147efb45a3aa5291016302727e7c74e5"
+    },
+    {
+      "path": "tests/attribution.test.mjs",
+      "sha256": "6bd676966879b0171cadbaf28d84acf0836c98eb25dafede40af25d3e9cf77e4"
     },
     {
       "path": "tests/bridge.test.mjs",
