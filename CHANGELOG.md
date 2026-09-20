@@ -4,6 +4,39 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.9.1
+
+### Fixed
+
+- **The quickstart failed in Windows PowerShell.** `cd … && node demo.mjs` is a parse error
+  there, and Windows PowerShell is still the default shell on Windows, so the first command
+  a new reader ran produced `The token '&&' is not a valid statement separator`. The
+  quickstart is now three separate lines. Reported by a reader running exactly what the
+  README said to run.
+- A test now rejects `&&` in any shell block in `README.md` or `docs/DESIGN-NOTES.md`. The
+  original verification ran the steps separately under pwsh 7, which accepts `&&`, so it
+  never executed the literal line being shipped.
+
+## 1.9.0
+
+Nothing in the plugin changed. This release is about letting someone evaluate the project
+without a DSH/Cordis host.
+
+### Added
+
+- **`demo.mjs` runs the routing and verdict logic with no host and no dependencies.** It
+  calls the same `selectRoute` and `parseVerdict` used in production; only the
+  qualification evidence is synthetic, and the demo says so. Seven scenes, each runnable
+  alone, showing refusals as prominently as successes.
+- **`docs/DESIGN-NOTES.md`** records the reasoning behind the decisions, readable without
+  installing anything, including the token estimate that was wrong and the agents that were
+  rejected after measuring what they would cost.
+- Repository signals: status badges, issue and pull-request templates, and a code of
+  conduct.
+- Seven tests keep the demo honest: CI fails if a scene stops running, if the
+  synthetic-evidence disclaimer disappears, if a refusal stops being demonstrated, or if
+  colour escapes leak into piped output.
+
 ## 1.8.1
 
 Three gaps that only appeared once the loop ran against real models rather than stubs.

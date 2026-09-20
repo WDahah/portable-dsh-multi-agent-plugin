@@ -6,9 +6,10 @@ Every number here was measured on this project. Where something is an opinion, i
 
 You can see most of these decisions run without installing anything:
 
-```bash
+```sh
 git clone https://github.com/WDahah/portable-dsh-multi-agent-plugin
-cd portable-dsh-multi-agent-plugin && node demo.mjs
+cd portable-dsh-multi-agent-plugin
+node demo.mjs
 ```
 
 ## 1. A capability you have not tested is a capability you do not have

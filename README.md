@@ -14,10 +14,13 @@ This is a native plugin for a compatible DeepSeek Harness (DSH)/Cordis host — 
 
 The parts that decide *which model runs what, and whether a result can be trusted* have no host calls and no dependencies. You can watch them work in about ten seconds:
 
-```bash
+```sh
 git clone https://github.com/WDahah/portable-dsh-multi-agent-plugin
-cd portable-dsh-multi-agent-plugin && node demo.mjs
+cd portable-dsh-multi-agent-plugin
+node demo.mjs
 ```
+
+Three separate lines, because `&&` is a parse error in Windows PowerShell — still the default shell on Windows — and a first command that fails is a poor introduction.
 
 It runs the **same** `selectRoute` and `parseVerdict` the plugin uses in production — only the qualification evidence is synthetic — and shows real refusals, provider-diversity selection, and why prose is never accepted as a verdict. Pass a scene name (`routing`, `refusal`, `expiry`, `diversity`, `verdicts`, `objective`, `aliases`) to run one alone.
 
@@ -206,7 +209,7 @@ node scripts/doctor.mjs
 
 The verifier checks listed file hashes in `portable-manifest.json` and detects missing/modified listed files. It is not an authenticity signature and does not reject unlisted extra files. Use a complete, finalized distribution with its manifest; do not fabricate a new manifest to conceal a failed check.
 
-Whether you clone or copy the folder, the files must keep their committed bytes. `.gitattributes` disables line-ending translation for exactly this reason. If verification reports many or all files as modified, the checkout rewrote line endings rather than the code being tampered with — refresh it with `git rm -r --cached . && git reset --hard` (or re-clone) instead of regenerating the manifest.
+Whether you clone or copy the folder, the files must keep their committed bytes. `.gitattributes` disables line-ending translation for exactly this reason. If verification reports many or all files as modified, the checkout rewrote line endings rather than the code being tampered with — re-clone it, or run `git rm -r --cached .` followed by `git reset --hard`, instead of regenerating the manifest.
 
 `--state-root` is optional; use it explicitly when isolating this installation. Supply exactly one of `--tools-module` or the alternative `--harness-root "<absolute installed host directory>"` discovery option, not both. The portable code uses Node built-ins; **`npm install` is not required for this package**. That does not remove the separate DSH host requirement.
 
