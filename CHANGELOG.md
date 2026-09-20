@@ -4,6 +4,29 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.4.0
+
+### Added
+
+- **Every refusal names the probe that would resolve it.** An `UNAVAILABLE` selection now
+  carries a `requalify` object per candidate route holding exact `orchestrator_qualify`
+  arguments, including `capabilities` for a probe-backed requirement and an `attestation`
+  skeleton for domain or data-class policy that no probe can grant. A hint given when no
+  evidence exists covers everything the task needs, so following it produces evidence that
+  actually satisfies the task rather than another refusal.
+- `EXPIRED_QUALIFICATION` reports `expiredAt` and `expiredForMs`, so a lapsed route says
+  when it lapsed and not merely that it did.
+- **Token usage is reported where cost cannot be.** Only 2 of 15 routes carry published
+  pricing, so `costUnknown` was the whole story for the rest. Direct tasks now report
+  `usage` per round and as a task total, with `usageRoundsMissing` counting rounds that
+  never settled — a null total beside that count, never a zero that would read as no
+  consumption.
+- Delegated assignments report `usage: null` with
+  `usage_reason: "CHILD_RESULT_CARRIES_NO_USAGE"`, naming the reason rather than leaving an
+  unknown cost to look like a free one.
+- `orchestrator_inventory` marks a route in no pool as `reserve: true`, distinguishing a
+  deliberately held-back route from a broken one.
+
 ## 1.3.0
 
 ### Added

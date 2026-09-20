@@ -15,7 +15,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "490da85cdf7ae2ed41131728585af5945e84ceb7ddb0ceaebd9c5c46857794d4"
+      "sha256": "80f203b89f588bdb38c803747721c1b2efb53cec96383f8f740755c0e684029e"
     },
     {
       "path": "CONTRIBUTING.md",
@@ -55,7 +55,7 @@
     },
     {
       "path": "docs/USAGE.md",
-      "sha256": "f324e90f985d348801b0638097b5edc0c15448caf9316f6fa69bc883337bdc8b"
+      "sha256": "58475475663877408b6c698070d5fc35101250f5af9b8f33633be1681c5b19c9"
     },
     {
       "path": "examples/PROJECT-PROMPT.md",
@@ -71,7 +71,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "5b2664dd8ad1c1af7f06f613f68dd95aadf4194712830ea883b420ec87019c89"
+      "sha256": "5ba7d0908ed4afe433cbf1b0c2db445b5b707d8ba3144a7781a9d8a6924eb97d"
     },
     {
       "path": "scripts/doctor.mjs",
@@ -91,7 +91,7 @@
     },
     {
       "path": "src/agent-dispatch.mjs",
-      "sha256": "e895cfba2e1dca33db6ecdc730045cd69579d604e3bd441b946e54d9c7a0e155"
+      "sha256": "22a5458b392c14b14a0f02b263b58674a9f245c35aaea701f397aee16f89f63d"
     },
     {
       "path": "src/cancellation.mjs",
@@ -99,7 +99,7 @@
     },
     {
       "path": "src/engine.mjs",
-      "sha256": "a6a9d2cbb837c6c822682994948d43d7dfa9e9327c3f01823be95427619a4fc0"
+      "sha256": "c964724a9a8e21b986e6abe849c9c556eeaa5df301f58eca91c68d08f60010ed"
     },
     {
       "path": "src/journal.mjs",
@@ -107,7 +107,7 @@
     },
     {
       "path": "src/plugin.mjs",
-      "sha256": "e52bb387190d403772e3717a0c31a5f22e93ef14026a9b445fca999b343fdfc9"
+      "sha256": "97355388f11f05fa28a4354d7207d891c81f2bc390d6edc9522fa65a1bca7c96"
     },
     {
       "path": "src/probes.mjs",
@@ -119,7 +119,7 @@
     },
     {
       "path": "src/routes.mjs",
-      "sha256": "7abe3970cc1766da38e2bf4b676e0254147efb45a3aa5291016302727e7c74e5"
+      "sha256": "6478ce048517f4616291604721420571f6ecf51f5c974f298f52c376c1ff09e2"
     },
     {
       "path": "tests/attribution.test.mjs",
@@ -148,6 +148,10 @@
     {
       "path": "tests/probes.test.mjs",
       "sha256": "b6ffe33828e1e7e70de88ac7d766faa7be09f0f3e9ce0ce838a9ff24a58118a9"
+    },
+    {
+      "path": "tests/reporting.test.mjs",
+      "sha256": "97ff25912c45de5bbfde7dea9761eca1bb7f40d6094a6ef60912e09c00de68e1"
     },
     {
       "path": "tests/routes.test.mjs",
