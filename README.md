@@ -1,8 +1,21 @@
 # Multi-agent: portable DSH/Cordis orchestration plugin
 
-**A native plugin for a compatible DeepSeek Harness (DSH)/Cordis host — not a standalone agent framework.** It routes each task to a model that has actually been tested for it, runs the work in a scoped child agent, and keeps a durable record of what was asked, which model answered, and what authorized the run.
+**One model writes the work. A different one reviews it. Neither of them decides whether it passed.**
 
-Any capable AI assistant can follow the installation guide. That does **not** mean every AI application can run this plugin: the destination host must provide compatible native `tools`, `llm` and `subagents` APIs.
+This is a native plugin for a compatible DeepSeek Harness (DSH)/Cordis host — not a standalone agent framework. It routes each task to a model that has actually been tested for it, runs the work in a scoped child agent, and keeps a durable record of what was asked, which model answered, and what authorized the run.
+
+## What it looks like
+
+A real run from this repository's own testing — GPT-5.6-Sol drafted a design proposal, Claude Opus reviewed it:
+
+```
+cycle 1: reviewed by claude/claude-opus-5 (independent=true)
+         verdict=verified  via schema  onObjective=true  -> VERIFIED
+```
+
+The reviewer approved the work **and still raised three findings**, confirmed each acceptance criterion individually, and asked a clarifying question. The verdict arrived through a host-enforced schema, so it is a structured decision rather than prose someone has to interpret.
+
+Then the plugin did what matters most: it **stored that verdict without judging it**. Deciding whether work is acceptable is not the orchestrator's job.
 
 ## Why use it
 
@@ -60,6 +73,34 @@ Every saved run records what was asked, which model answered **per round**, and 
 
 A read-only task may continue in a new child after a token limit. A task that can write files or run commands **stops instead** (`PARTIAL_NEEDS_RECONCILIATION`), because the earlier attempt may already have changed something. Cancelled, interrupted, or uncertain attempts are never replayed automatically.
 
+### 6. Review work with a model that did not write it
+
+A review that runs on the model it is judging shares that model's blind spots. When a run declares `reviews`, the orchestrator prefers a candidate from a **different provider**, and the reviewer is handed the subject's request and answer as fenced data it is explicitly told not to obey.
+
+When no other provider is qualified, the review still happens — and records `independence: false` with a reason, rather than passing as independent.
+
+`orchestrator_iterate` turns that into a bounded loop: review, revise from the findings, review again, capped at 3 cycles. It advances only on a **declared verdict** and never on its own reading of the work:
+
+| Stop | Meaning |
+|---|---|
+| `VERIFIED` | The reviewer verified the work |
+| `NEEDS_CLARIFICATION` | Returned to you; the task lacked information |
+| `UNCONVERGED` | Hit the cap without a verified result — not "done" |
+| `VERDICT_UNREADABLE` | No usable verdict, so no state was inferred |
+
+That last one is the important one. During live testing a reviewer was truncated by a token limit and returned nothing; the loop **stopped and said so** instead of guessing that the work had passed.
+
+### 7. Spend fewer tokens than the obvious design
+
+A review-and-revise loop is 5–6 model calls, and a naive implementation re-sends the whole artifact to every one of them. Measured against that same loop without the mechanisms here — structured verdicts instead of prose, revisers fed findings rather than a re-sent request, early exit on `verified`:
+
+| | Input tokens |
+|---|---|
+| Without | ~23,100 |
+| **With** | **~9,300** — a 60% reduction |
+
+Optional compaction shaves more as artifacts grow: 9% at 3,000 characters, 16% at 12,000, 18% at 24,000.
+
 ## A first task
 
 Read-only, and the model is chosen for you:
@@ -91,6 +132,7 @@ Read the result back later with `orchestrator_delegate_read({"run_id": "auth-ins
 | `orchestrator_plan` / `orchestrator_run` | Persist and run a direct model task with bounded continuation |
 | `orchestrator_read` | Saved output, route, prompt and accounting |
 | `orchestrator_resume` | Resume only a settled, safe state; never an uncertain replay |
+| `orchestrator_iterate` | Review a run and, while its verdict asks for more, run bounded revise cycles |
 | `orchestrator_capacity` | What can be dispatched now, per pool, and the probe that would fix anything unusable |
 | `orchestrator_list` | Find saved assignments, tasks and evidence; summaries only |
 | `orchestrator_forget` | Permanently delete a saved record or lapsed evidence |
@@ -100,10 +142,14 @@ Full argument details are in [docs/USAGE.md](docs/USAGE.md).
 
 ## What it does not do
 
+Being clear about this matters more than the feature list, because every claim above is bounded by it.
+
+- **It does not judge your work.** A verdict is the reviewer's declaration, stored verbatim. The plugin reads the declared state to decide whether a cycle may continue; it never reads prose to decide whether work is good.
 - **It is not a budget cap.** `$1` is a soft target; requests can exceed it. Most routes report `costUnknown` with token counts instead of a price, and unknown cost never means free.
 - **It is not a security boundary.** It connects to real host services under your existing sandbox, permissions and approval policy.
-- **It does not certify competence.** A passed probe shows one route answered one bounded challenge; it is not proof of skill, and a completed run is not proof the answer is correct.
-- **It does not run several models in parallel on one task.** One delegation is one scoped child at a time; eligible read-only continuation uses a further child.
+- **It does not certify competence.** A passed probe shows one route answered one bounded challenge. Specialist-domain and confidential work require a named human attestation precisely because no probe can establish them.
+- **It does not run several models in parallel on one task.** One delegation is one scoped child at a time; a review is a separate run, not a second opinion fetched concurrently.
+- **Agents do not talk to each other.** The host caps delegation at one level, and every hand-off is recorded through the parent as data. There is no side channel whose outcome escapes the journal.
 
 ## Start here
 
