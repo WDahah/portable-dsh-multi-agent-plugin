@@ -22,11 +22,13 @@ That is roughly **79× less context consumed** in the calling conversation for o
 Role, risk and complexity choose the pool; you do not name a model:
 
 ```
-R04 routine, low risk   ->  codex/gpt-5.6-terra   medium   (balanced)
-R07 review,  low risk   ->  claude/claude-opus-5  high     (advanced)
+standard, low risk  ->  codex/gpt-5.6-terra   medium   (balanced)
+review,   low risk  ->  claude/claude-opus-5  high     (advanced)
 ```
 
 Cheap models handle routine work; expensive ones are reserved for review, high risk, or complex tasks. An `escalate` flag reaches the long-horizon pool.
+
+Five roles — `standard`, `deep`, `review`, `vision`, `domain` — each naming routing you can observe. A free-text `intent` records what the task is *for* and appears in the child's label, without ever changing the model.
 
 ### 3. Never guess whether a model can do the job
 
@@ -64,7 +66,8 @@ Read-only, and the model is chosen for you:
 
 ```json
 {
-  "task": {"role": "R04", "category": "code-inspection", "risk": "low",
+  "task": {"role": "standard", "intent": "explain the auth flow",
+           "category": "code-inspection", "risk": "low",
            "complexity": "routine", "escalate": false,
            "dataClass": "internal", "capabilities": ["text", "tools"]},
   "run_id": "auth-inspect-001",
@@ -175,7 +178,7 @@ Routes in no pool are reported as `reserve: true`: held back deliberately, not b
 - Native/subscription costs may be **unknown**, not zero. Direct tasks report token usage where no price exists; delegated runs report why no token count is available.
 - Direct tasks can continue clean token-limit stops; uncertain interrupted attempts are not blindly retried. File-changing agents do not automatically repeat potentially completed side effects.
 - Raw concatenation of saved continuation rounds can omit a newline at a boundary. Saved content is not a guarantee of correctly formatted or semantically complete output.
-- Basic smoke evidence does not qualify image work (`R05`) or specialist-domain work (`R08`/`R09`); each needs its own probe or attestation.
+- Basic smoke evidence does not qualify the `vision` or `domain` roles; each needs its own probe or attestation.
 - At most two qualifications and two delegations run concurrently per owner; further calls are refused rather than queued.
 
 Use a fresh state directory on the destination machine. Keep it private: prompts and visible outputs are stored in plaintext until you delete them with `orchestrator_forget`. Review the full security document before use.

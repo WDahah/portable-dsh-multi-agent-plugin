@@ -4,6 +4,30 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.6.0
+
+### Added
+
+- **Roles are named for what they do.** Five roles replace the numeric codes:
+  `standard`, `deep`, `review`, `vision`, and `domain`. Each names routing that can be
+  observed in the result, so a reader can predict the pool and effort from the label.
+- **A free-text `intent` records what a task is for** — `"add password reset"` — on the
+  assignment, in the child's label, and in `orchestrator_list`. It never affects routing:
+  two runs with opposite intents and the same role reach the same model. A label that
+  quietly changed the model would be a routing rule disguised as documentation.
+
+### Changed
+
+- The codes `R01`–`R12` still work and route exactly as before, but are deprecated. A
+  selection reports `role`, `roleSupplied`, and `roleDeprecated`, and adds a
+  `DEPRECATED_ROLE_CODE` warning, so migration needs no guesswork.
+- `R02`, `R03`, `R06`, `R10` and `R12` were never documented anywhere, and `R03` and `R12`
+  silently reached the advanced pool at higher cost. Each now maps to the behavior it
+  already produced rather than to a meaning invented after the fact. `R08` and `R09` were
+  always identical, so both map to `domain`.
+- Behavior preservation was verified by capturing all 84 role-and-variant outcomes from
+  the previous build and replaying them against this one: every outcome is unchanged.
+
 ## 1.5.0
 
 ### Added

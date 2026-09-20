@@ -23,7 +23,7 @@ Live evidence is exact to provider/model/effort and **owner/root agent session**
 
 A failed probe stays unavailable; do not forge qualification JSON, promote synthetic fixtures, silently alias another model, or uninstall a provider to hide a failure. Automatic requalification is not claimed. Basic smoke verifies limited text/tool behavior, not broad competence, confidentiality or an immutable backend identity.
 
-`R05` needs a passed image probe; `R08`/`R09` need domain evidence; confidential/restricted data needs an operator attestation. Each is requested through `orchestrator_qualify` (see [USAGE.md](USAGE.md)), and none is granted by basic smoke alone.
+The `vision` role needs a passed image probe; the `domain` role needs domain evidence; confidential/restricted data needs an operator attestation. Each is requested through `orchestrator_qualify` (see [USAGE.md](USAGE.md)), and none is granted by basic smoke alone.
 
 An attestation records a named human claim and its written basis, and widens routing policy only. It is **not** a capability proof, an entitlement check, a compliance control, or a privacy certification, and this plugin cannot verify that its author was authorized to make it. A stored record whose policy exceeds ordinary smoke without an attestation is refused as tampered. Confidential and restricted data still require whatever controls your environment actually demands; recording an attestation does not create them.
 

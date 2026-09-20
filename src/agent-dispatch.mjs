@@ -2,9 +2,11 @@ import {createRecordStore, keyOf, need, normalizeEvidence, scopedSignal, visible
 
 const READ_ONLY = new Set(['read', 'glob', 'grep', 'orchestrator_qualification_echo']);
 const KNOWN_TOOLS = new Set([...READ_ONLY, 'write', 'edit', 'pwsh']);
-/** Human-readable child identity: role, exact route and effort, then the round. */
-export function routeLabel(role, route, effort, round) {
-  return `${role || 'task'} · ${route.provider}/${route.model} · ${effort} · round ${round}`;
+/** Human-readable child identity: role, exact route and effort, then the round. An intent
+ * is appended when supplied, so a tree shows what the caller meant as well as how it ran. */
+export function routeLabel(role, route, effort, round, intent) {
+  const purpose = typeof intent === 'string' && intent.trim() ? `${role || 'task'}: ${intent.trim().slice(0, 60)}` : (role || 'task');
+  return `${purpose} · ${route.provider}/${route.model} · ${effort} · round ${round}`;
 }
 export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 900000}) {
   need(Number.isSafeInteger(deadlineMs) && deadlineMs > 0 && deadlineMs <= 900000, 'INVALID_DEADLINE');
@@ -32,6 +34,10 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
         // The evidence that authorized this dispatch, so the record answers what permitted
         // the run and not only which model answered it.
         evidence: normalizeEvidence(args.evidence),
+        // The canonical role that routed this run, and the caller's own words for what it
+        // was for. Intent is recorded only: it never influenced the routing above.
+        role: typeof args.role === 'string' ? args.role : null,
+        intent: typeof args.intent === 'string' && args.intent.trim() ? args.intent.trim().slice(0, 200) : null,
         createdAt: Date.now(), deadlineAt: Date.now() + deadlineMs};
       await save();
       scope = scopedSignal(exec.signal, deadlineMs); controllers.add(scope.controller);
@@ -50,7 +56,7 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
         run = await subagents.start('spawn', {parent: exec.agent, signal: scope.signal,
           // The label is the only identity a session tree shows, so it names the exact
           // route: two children on different models are otherwise indistinguishable.
-          label: routeLabel(args.role, route, effort, index + 1),
+          label: routeLabel(args.role, route, effort, index + 1, args.intent),
           prompt: [{type: 'text', text: args.prompt + continuation}],
           agentOptions: {provider: route.provider, model: route.model, reasoningEffort: effort, maxTokens},
           maxDepth: 1, toolFilter: {allow: [...tools]}, persona: 'Complete only the delegated task within its explicit scope. Do not delegate. Report partial work accurately.'});
@@ -99,6 +105,7 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
       // A record written before evidence was linked reports null rather than a fabricated
       // link, and says so through evidence_recorded.
       evidence: record.evidence ?? null, evidence_recorded: record.evidence != null,
+      role: record.role ?? null, intent: record.intent ?? null,
       approval_required: false, automatic_retry: false, continuation_safe: record.continuation_safe, continuation_uses_new_child: true};
   }
   async function read(runId, offset = 0) {
@@ -116,7 +123,8 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
         effort: record.effort, rounds: Array.isArray(record.rounds) ? record.rounds.length : 0,
         total_chars: typeof record.visibleText === 'string' ? record.visibleText.length : 0,
         allowed_tools: [...(record.allowed_tools ?? [])], created_at: record.createdAt ?? null,
-        evidence_id: record.evidence?.evidenceId ?? null, evidence_recorded: record.evidence != null}))
+        evidence_id: record.evidence?.evidenceId ?? null, evidence_recorded: record.evidence != null,
+        role: record.role ?? null, intent: record.intent ?? null}))
       .sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
   }
   /** Delete one saved assignment. A run in flight is refused rather than deleted beneath

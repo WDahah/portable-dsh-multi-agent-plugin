@@ -51,8 +51,32 @@ export const POOL_PRIORITY = freeze({
   // an image probe. This pool exists for deliberately choosing the dedicated vision model.
   vision: ['deepseek-v4-vision']
 });
-const advancedRoles = new Set(['R03', 'R07', 'R08', 'R09', 'R12']);
-const domainRoles = new Set(['R08', 'R09']);
+/** Roles name what the selector actually does, so a reader can predict the routing from
+ * the label. Anything a role cannot decide belongs in `intent`, which is recorded and
+ * never routed — a name that does not change behavior would only mislead. */
+export const ROLES = Object.freeze({
+  standard: {pool: 'balanced', domain: false, image: false, describes: 'Ordinary work: the balanced pool at standard effort.'},
+  deep: {pool: 'advanced', domain: false, image: false, describes: 'Work worth a stronger model: the advanced pool at deep effort.'},
+  review: {pool: 'advanced', domain: false, image: false, describes: 'Judging another run. Routes like deep and prefers a different provider from the run under review.'},
+  vision: {pool: 'balanced', domain: false, image: true, describes: 'Work whose input is an image. Requires a passed image probe.'},
+  domain: {pool: 'advanced', domain: true, image: false, describes: 'Specialist field. Requires an operator attestation; no probe can grant it.'},
+});
+export const ROLE_NAMES = Object.freeze(Object.keys(ROLES));
+/** The numeric codes shipped since 1.0.0. Five were never documented anywhere, so each
+ * maps to the behavior it already produced rather than to an invented meaning. */
+export const ROLE_ALIASES = Object.freeze({
+  R01: 'standard', R02: 'standard', R04: 'standard', R06: 'standard', R10: 'standard', R11: 'standard',
+  R03: 'deep', R07: 'review', R12: 'deep',
+  R05: 'vision',
+  R08: 'domain', R09: 'domain',
+});
+/** Resolve a role to its canonical name, reporting whether a deprecated code was used. */
+export function resolveRole(role) {
+  if (typeof role !== 'string') return null;
+  if (Object.hasOwn(ROLES, role)) return {role, deprecated: false, supplied: role};
+  if (Object.hasOwn(ROLE_ALIASES, role)) return {role: ROLE_ALIASES[role], deprecated: true, supplied: role};
+  return null;
+}
 const allowedCapabilities = new Set(['text', 'tools', 'image', 'structured-output', 'video']);
 const nonempty = (value, max = 256) => typeof value === 'string' && value.length > 0 && value.length <= max;
 // Ordinary smoke evidence admits only these; wider classes require an attestation.
@@ -65,17 +89,22 @@ export function expectedEffort(routeOrId, pool) {
   return entry.effortsExpected[pool === 'long-horizon' ? 'long' : pool === 'advanced' ? 'deep' : 'standard'];
 }
 function taskPolicy(task) {
-  if (!task || !/^R(0[1-9]|1[0-2])$/.test(task.role) || !nonempty(task.category) ||
+  const resolved = task ? resolveRole(task.role) : null;
+  if (!task || !resolved || !nonempty(task.category) ||
       !['low', 'medium', 'high', 'critical'].includes(task.risk) ||
       !['routine', 'moderate', 'complex'].includes(task.complexity) || typeof task.escalate !== 'boolean') return null;
+  // intent records what the caller meant; it never routes, so it is free text.
+  if (task.intent !== undefined && !nonempty(task.intent, 200)) return null;
   if (task.pool !== undefined && !Object.hasOwn(POOL_PRIORITY, task.pool)) return null;
   if (task.dataClass !== undefined && !['public', 'internal', 'confidential', 'restricted'].includes(task.dataClass)) return null;
   if (task.capabilities !== undefined && (!Array.isArray(task.capabilities) || task.capabilities.some(c => !allowedCapabilities.has(c)))) return null;
-  const normal = task.escalate ? 'long-horizon' : advancedRoles.has(task.role) || ['high', 'critical'].includes(task.risk) || task.complexity === 'complex' ? 'advanced' : 'balanced';
+  const advanced = ROLES[resolved.role].pool === 'advanced';
+  const normal = task.escalate ? 'long-horizon' : advanced || ['high', 'critical'].includes(task.risk) || task.complexity === 'complex' ? 'advanced' : 'balanced';
   // Explicit pool is a deliberate policy override, never an unavailable-route fallback.
-  return {pool: task.pool ?? normal, reason: task.pool ? 'EXPLICIT_POOL' : task.escalate ? 'ESCALATED' : normal === 'advanced' ? 'ROLE_OR_RISK_OR_COMPLEXITY' : 'BALANCED_DEFAULT'};
+  return {role: resolved, pool: task.pool ?? normal,
+    reason: task.pool ? 'EXPLICIT_POOL' : task.escalate ? 'ESCALATED' : normal === 'advanced' ? 'ROLE_OR_RISK_OR_COMPLEXITY' : 'BALANCED_DEFAULT'};
 }
-function recordReason(q, route, effort, task, now) {
+function recordReason(q, route, effort, task, now, roleName) {
   if (q.schemaVersion !== 1 || q.qualificationType !== 'smoke' || q.issuer?.kind !== 'plugin-service' ||
       q.issuer.service !== 'orchestration-v3' || !nonempty(q.issuer.runtimeId) || !nonempty(q.runtimeBuildId) || !nonempty(q.adapterFingerprint) ||
       !integer(q.issuedAt) || !integer(q.expiresAt) || !integer(q.durationMs) || q.expiresAt <= q.issuedAt ||
@@ -94,12 +123,18 @@ function recordReason(q, route, effort, task, now) {
   if (!q.transportPassed || !q.textPassed || !passed('text')) return 'TEXT_OR_TRANSPORT_FAILED';
   if (!q.toolPassed || !passed('native-tool-roundtrip')) return 'NATIVE_TOOL_ROUNDTRIP_REQUIRED';
   const capabilities = new Set([...route.capabilitiesRequired, ...(task.capabilities ?? [])]);
-  if (task.role === 'R05') capabilities.add('image');
+  if (ROLES[roleName].image) capabilities.add('image');
   if (capabilities.has('image') && (!q.imagePassed || !passed('image'))) return 'IMAGE_PROBE_REQUIRED';
   for (const capability of ['structured-output', 'video']) if (capabilities.has(capability) && !passed(capability)) return 'CAPABILITY_PROBE_REQUIRED:' + capability;
   if (!q.allowedDataClasses.includes(task.dataClass ?? 'public')) return 'DATA_CLASS_NOT_QUALIFIED';
-  if (domainRoles.has(task.role) && !q.domainEvidence) return 'DOMAIN_EVIDENCE_REQUIRED';
+  if (ROLES[roleName].domain && !q.domainEvidence) return 'DOMAIN_EVIDENCE_REQUIRED';
   return null;
+}
+/** Report the canonical role beside whatever the caller supplied, so a deprecated code can
+ * be migrated without guessing, and carry intent through unchanged as a recorded label. */
+function roleView(policy, task) {
+  return {role: policy.role.role, roleSupplied: policy.role.supplied,
+    roleDeprecated: policy.role.deprecated, intent: task.intent ?? null};
 }
 /** Input records are detached data read by the plugin from its private journal, NEVER tool arguments.
  * Schema/provenance labels are not authentication or cryptographic proof. */
@@ -114,11 +149,11 @@ export function selectRoute({task, qualifications, now = Date.now()} = {}) {
     if (!matching.length) {
       // With no evidence at all, the hint must still name every capability this task will
       // need, or following it would produce evidence that cannot satisfy the task.
-      const needed = [...new Set([...(task.capabilities ?? []), ...(task.role === 'R05' ? ['image'] : [])])]
+      const needed = [...new Set([...(task.capabilities ?? []), ...(ROLES[policy.role.role].image ? ['image'] : [])])]
         .filter(capability => capability !== 'text' && capability !== 'tools');
       const requalify = {route_id: id, effort};
       if (needed.length) requalify.capabilities = needed;
-      if (domainRoles.has(task.role)) requalify.attestation = {domainEvidence: true, attestedBy: '<who reviewed this>', basis: '<what you reviewed or ran>'};
+      if (ROLES[policy.role.role].domain) requalify.attestation = {domainEvidence: true, attestedBy: '<who reviewed this>', basis: '<what you reviewed or ran>'};
       if (task.dataClass && !BASE_DATA_CLASSES.includes(task.dataClass)) {
         requalify.attestation = {...(requalify.attestation ?? {}), dataClasses: [...BASE_DATA_CLASSES, task.dataClass], attestedBy: '<who reviewed this>', basis: '<what you reviewed or ran>'};
       }
@@ -128,7 +163,7 @@ export function selectRoute({task, qualifications, now = Date.now()} = {}) {
     if (matching.some(q => !integer(q.issuedAt))) {reasons.push({id, effort, reason: 'INVALID_QUALIFICATION'}); continue;}
     const newest = Math.max(...matching.map(q => q.issuedAt));
     const latest = matching.filter(q => q.issuedAt === newest);
-    const reason = latest.length !== 1 ? 'AMBIGUOUS_LATEST_QUALIFICATION' : recordReason(latest[0], route, effort, task, now);
+    const reason = latest.length !== 1 ? 'AMBIGUOUS_LATEST_QUALIFICATION' : recordReason(latest[0], route, effort, task, now, policy.role.role);
     if (reason) {
       // Every refusal names the exact probe that would resolve it, so a caller is not left
       // to guess which route and effort to qualify next.
@@ -152,9 +187,10 @@ export function selectRoute({task, qualifications, now = Date.now()} = {}) {
       caseResults: latest[0].caseResults.filter(c => c?.passed === true).map(c => c.name),
       attestedBy: latest[0].attestation?.attestedBy ?? null,
     };
+    const warnings = ['SMOKE_IS_NOT_ROLE_COMPETENCE_CERTIFICATION', 'MODEL_STRING_IS_NOT_IMMUTABLE_BACKEND_IDENTITY'];
+    if (policy.role.deprecated) warnings.push('DEPRECATED_ROLE_CODE');
     return {...base, status: 'SELECTED', route, effort, pool: policy.pool, reason: policy.reason,
-      qualification: evidence,
-      warnings: ['SMOKE_IS_NOT_ROLE_COMPETENCE_CERTIFICATION', 'MODEL_STRING_IS_NOT_IMMUTABLE_BACKEND_IDENTITY'], reasons};
+      ...roleView(policy, task), qualification: evidence, warnings, reasons};
   }
-  return {...base, status: 'UNAVAILABLE', pool: policy.pool, reason: 'NO_QUALIFIED_ROUTE_IN_POOL', reasons};
+  return {...base, status: 'UNAVAILABLE', pool: policy.pool, reason: 'NO_QUALIFIED_ROUTE_IN_POOL', ...roleView(policy, task), reasons};
 }

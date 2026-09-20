@@ -1,5 +1,6 @@
 {
-  "role": "R04",
+  "role": "standard",
+  "intent": "explain the authentication flow",
   "category": "implementation",
   "risk": "low",
   "complexity": "routine",
