@@ -15,7 +15,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "3846906f47d1f0ec8b348508f213016f7e2dc775f64b036c675b628f1bfefb3b"
+      "sha256": "490da85cdf7ae2ed41131728585af5945e84ceb7ddb0ceaebd9c5c46857794d4"
     },
     {
       "path": "CONTRIBUTING.md",
@@ -51,11 +51,11 @@
     },
     {
       "path": "docs/SECURITY-AND-LIMITS.md",
-      "sha256": "c75c23b126c5daac94f8c98ecb396e58d036d7b4bf8a7a7ce35581a6c8b8fd73"
+      "sha256": "3582135aa4ad4c95354a8e51c7c807ce8a4ea6261a5ace256133c694514e15bd"
     },
     {
       "path": "docs/USAGE.md",
-      "sha256": "c7402830c7507f1b44461da8e8a8988f6e778c1e8593fee5cd4037a0117ae714"
+      "sha256": "f324e90f985d348801b0638097b5edc0c15448caf9316f6fa69bc883337bdc8b"
     },
     {
       "path": "examples/PROJECT-PROMPT.md",
@@ -71,7 +71,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "ceaf6798f7e05eb7094d2ca161f6874f110c7b5188642a029557d18c022d2ed6"
+      "sha256": "5b2664dd8ad1c1af7f06f613f68dd95aadf4194712830ea883b420ec87019c89"
     },
     {
       "path": "scripts/doctor.mjs",
@@ -91,7 +91,7 @@
     },
     {
       "path": "src/agent-dispatch.mjs",
-      "sha256": "8b0305d98d52c5144c7ba4e64610670840dd5c26d4bba3b2d278d832a6dbe93a"
+      "sha256": "e895cfba2e1dca33db6ecdc730045cd69579d604e3bd441b946e54d9c7a0e155"
     },
     {
       "path": "src/cancellation.mjs",
@@ -99,15 +99,15 @@
     },
     {
       "path": "src/engine.mjs",
-      "sha256": "36894670e3bcdfca73510306ad083ae3bf64cc1dfbe8be888e4a49a57ab51d19"
+      "sha256": "a6a9d2cbb837c6c822682994948d43d7dfa9e9327c3f01823be95427619a4fc0"
     },
     {
       "path": "src/journal.mjs",
-      "sha256": "3c30a592b02b7642c3c4f2c9469d25d2cd5a463161c3fb02209afe3842b0dbc6"
+      "sha256": "ec760f78f987d8ff73d0f24a23800bcaf188149c2c4b83b33f8447f652baef25"
     },
     {
       "path": "src/plugin.mjs",
-      "sha256": "1ab4378168fe427b4753afa34852926c3f289fc23a32ae7d0bdffba1629640fc"
+      "sha256": "e52bb387190d403772e3717a0c31a5f22e93ef14026a9b445fca999b343fdfc9"
     },
     {
       "path": "src/probes.mjs",
@@ -115,7 +115,7 @@
     },
     {
       "path": "src/qualification.mjs",
-      "sha256": "35b5655e1709f7bab5cb28907f93ad27bfad0ff6dce9d991bbc8308766286721"
+      "sha256": "4c01da4eb0109226c6525a62067fb761bb464548d9c15afd4caee84e0e5209cf"
     },
     {
       "path": "src/routes.mjs",
@@ -127,11 +127,11 @@
     },
     {
       "path": "tests/bridge.test.mjs",
-      "sha256": "769b6f73e411ea3f569fbca089d15fd5cee6d96604c17ff3095fad0556b92f01"
+      "sha256": "07d4f6c30c500ccc47ff1a295ce553aca025c2dc24c74279b03983ad4425f5a4"
     },
     {
       "path": "tests/core.test.mjs",
-      "sha256": "063adc4e974d73b8370031c6c2c0db366455150c63b499ac72dfdd50b3b5c1c2"
+      "sha256": "644c7af5a2e5f8b840cf9ca7d0b54edad69a6b51f173669a5178693fa15bf4fc"
     },
     {
       "path": "tests/diagnostic.test.mjs",
@@ -156,6 +156,10 @@
     {
       "path": "tests/setup.test.mjs",
       "sha256": "e85a9c237913cc5c3bd8ef40abf1ae42e7664bea14c6ab36eb0f6d223eb2e4fd"
+    },
+    {
+      "path": "tests/state-management.test.mjs",
+      "sha256": "705569f88a0e78dbbc8e181f1a60c1ab64af6ecd7608ccb90319a01c25385b3f"
     }
   ]
 }

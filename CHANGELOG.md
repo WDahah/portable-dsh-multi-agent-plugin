@@ -4,6 +4,31 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.3.0
+
+### Added
+
+- **`orchestrator_forget` deletes saved records.** Nothing pruned state before, so
+  assignments, direct tasks, and expired qualification evidence accumulated indefinitely
+  with prompts and outputs in plaintext, removable only by deleting directories by hand.
+  It takes exactly one target — `run_id`, `task_id`, or `qualifications` (`expired` or
+  `all`) — refuses a record that is in flight rather than deleting it beneath itself, and
+  frees the id for reuse.
+- **`orchestrator_list` shows what is stored.** Reading a saved record previously required
+  remembering its exact id; without one the record was unreachable while still occupying
+  disk. Listing returns summaries only — never the saved output text — for assignments,
+  tasks, and qualifications, newest first, with a `kind` filter.
+- `orchestrator_read` and `orchestrator_delegate_read` return the original `prompt`, so a
+  saved record shows what was asked and not only what came back. The prompt was already
+  stored; it was simply never surfaced.
+
+### Changed
+
+- A direct task's readable id is recorded in a side index beside its journal, because task
+  directories are named by digest. The index is a convenience: a task missing from it
+  still lists, reported with a null id and its digest rather than being hidden, and a
+  failure to write the hint never fails the task itself.
+
 ## 1.2.1
 
 ### Fixed

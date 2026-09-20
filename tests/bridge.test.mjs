@@ -145,7 +145,7 @@ test('SYNTHETIC injected host registers tools, qualifies fixture, plans and disp
     return {id: 'synthetic-injected-child', result: Promise.resolve({stopReason: 'completed', output: [{type: 'text', text: `QUALIFIED:${response.marker}:42`}]}), async dispose() {}};
   }};
   createPlugin(definition => definition).apply(host.ctx, {stateRoot: fresh(), enabled: true});
-  assert.deepEqual([...host.definitions.keys()].sort(), ['orchestrator_delegate', 'orchestrator_delegate_read', 'orchestrator_inventory', 'orchestrator_plan', 'orchestrator_qualification_echo', 'orchestrator_qualify', 'orchestrator_read', 'orchestrator_resume', 'orchestrator_run'].sort());
+  assert.deepEqual([...host.definitions.keys()].sort(), ['orchestrator_delegate', 'orchestrator_delegate_read', 'orchestrator_forget', 'orchestrator_inventory', 'orchestrator_list', 'orchestrator_plan', 'orchestrator_qualification_echo', 'orchestrator_qualify', 'orchestrator_read', 'orchestrator_resume', 'orchestrator_run'].sort());
   assert.equal(host.definitions.get('orchestrator_plan').timeoutMs, 60000); assert.equal(host.definitions.get('orchestrator_run').timeoutMs, 910000);
   const e = exec(), result = await host.definitions.get('orchestrator_qualify').execute({route_id: route.id, effort: 'high'}, e);
   assert.equal(result.qualification.available, true);

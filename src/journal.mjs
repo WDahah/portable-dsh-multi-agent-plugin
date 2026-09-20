@@ -140,5 +140,33 @@ export function createJournal(root, owner) {
       validateTransition(current,record);
       const handle=await fs.open(path.join(directory,`${String(record.revision).padStart(8,'0')}.json`),'wx',0o600);try{await handle.writeFile(body,'utf8');await handle.sync();}finally{await handle.close();}return record;
     });
+  },
+  /** Load every task this owner has stored. Task directory names are digests, so the
+   * readable id lives inside each record and is supplied by the caller's own mapping. */
+  async tasks(){
+    const ownerDirectory=path.join(root,owner);
+    if(!await directories(ownerDirectory,false))return [];
+    const found=[];
+    for await(const entry of await fs.opendir(ownerDirectory)){
+      if(!entry.isDirectory()||entry.isSymbolicLink()||!/^x[a-f0-9]{63}$/.test(entry.name))continue;
+      found.push(entry.name);
+    }
+    const records=[];
+    for(const task of found){
+      // A corrupt or unreadable task must not hide every healthy one from a listing.
+      try{const record=await serial(task,()=>latest(path.join(root,owner,task),owner,task));if(record)records.push({task,record});}
+      catch{records.push({task,record:null});}
+    }
+    return records;
+  },
+  /** Delete one task's whole revision directory, refusing a linked or foreign path. */
+  remove(task){
+    id(task);
+    return serial(task,async()=>{
+      const directory=path.join(root,owner,task);
+      if(!await directories(directory,false))return false;
+      await fs.rm(directory,{recursive:true,force:true});
+      return true;
+    });
   }});
 }
