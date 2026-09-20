@@ -15,7 +15,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "52b34e14d22264ecce629a5b8dc2d352b0950b727ada139ed1bf6a9e72ec8c09"
+      "sha256": "186f5b9c020b4b5cae051551ada6433df424bc5f308eaa68a966e7aca54f9e6d"
     },
     {
       "path": "CONTRIBUTING.md",
@@ -23,7 +23,7 @@
     },
     {
       "path": "INSTALL-WITH-AI.md",
-      "sha256": "8ba5c7e05f1357b9a5cf10bed180ea02437fdaeaa682ea9e0f24c0f1ca2cb8cb"
+      "sha256": "9989697c51df9c6299291a7166896cae266bd1b0efc746528625316dab12a92e"
     },
     {
       "path": "LICENSE",
@@ -31,7 +31,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "db778b22f4d089b7235f2dafcb1ff96f84c5199443f352f6a01bf02e2606d354"
+      "sha256": "47e672f61c3beaf4afe174d37320c4b300dcb6f924532ed3638916fd7724c503"
     },
     {
       "path": "SECURITY.md",
@@ -39,7 +39,7 @@
     },
     {
       "path": "START-HERE.md",
-      "sha256": "78359262430d514eb644c42474d3e47c720b31f938b64b18476b75b213e20b18"
+      "sha256": "039ed6721594fa6acd7c329846b8be7e5515eebaa5e471d1062773f402acd8f9"
     },
     {
       "path": "VALIDATION.md",
@@ -55,7 +55,7 @@
     },
     {
       "path": "docs/USAGE.md",
-      "sha256": "534647192591e0701b16d0d732b37f8cb3d61ebcaa397fff55aaa0e083971726"
+      "sha256": "e79ccdabd90d810831dedf4478fd62ffb3b6f4d8d977216f3fb1b2586879f9a5"
     },
     {
       "path": "examples/PROJECT-PROMPT.md",
@@ -71,7 +71,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "9267ca380ae84797b0802429b194c6c618f8d4e8774d590652c5a1a6a1fbc87f"
+      "sha256": "9720f32bcf6a92686d7b7b53244f7dc83b1c505927aa6e72dee0557226eaf1d9"
     },
     {
       "path": "scripts/doctor.mjs",
@@ -91,7 +91,7 @@
     },
     {
       "path": "src/agent-dispatch.mjs",
-      "sha256": "ed61208459f023326bb28192da5b7c9f5831b64850ef9971edaf4c7a067782fc"
+      "sha256": "555f4b1157213187e0c7c83452313dd4af2b6dbbe41745058c7b4f5c9a736694"
     },
     {
       "path": "src/cancellation.mjs",
@@ -107,7 +107,7 @@
     },
     {
       "path": "src/plugin.mjs",
-      "sha256": "67b5b69a1d026212143a2e4e706e57d44cf43d987b09e16cd4ec4e6e8a46d318"
+      "sha256": "08ce8aa18cbd5540079968090a385d127b1df1d5ff59cf1f3b8fcf26e8ec2e56"
     },
     {
       "path": "src/probes.mjs",
@@ -122,16 +122,20 @@
       "sha256": "3e788d216aaea251b761842580a1b98a807534f84bad675bf6a9001288456bb9"
     },
     {
+      "path": "src/verdict.mjs",
+      "sha256": "a298b8a3b46dc4afd8136ad27ec922484ed7a2e62765d4afa2c6cb8e51a64b8f"
+    },
+    {
       "path": "tests/attribution.test.mjs",
       "sha256": "6bd676966879b0171cadbaf28d84acf0836c98eb25dafede40af25d3e9cf77e4"
     },
     {
       "path": "tests/bridge.test.mjs",
-      "sha256": "b8143512a833511404aa30f6da26ed6daa6789c727dc88834546495d36d96da5"
+      "sha256": "2e7f3713bb129c1b97067287a17c864b8f165cf6d4dc0df7d8c652268c6d5f1f"
     },
     {
       "path": "tests/core.test.mjs",
-      "sha256": "4854a5eae8543bdeb56d8019a4c4c7c895376de718c53056f39f313cc6880cbc"
+      "sha256": "aac2bd5fefc96858ec2a2d4102519fd5ff5a275b96a40a7dfdcf83e005d9c98b"
     },
     {
       "path": "tests/diagnostic.test.mjs",
@@ -148,6 +152,10 @@
     {
       "path": "tests/helpers/tmp.mjs",
       "sha256": "1ce09c17887411ded987f92bdbd93b0a080edcccad58b2510345abcaecbb8352"
+    },
+    {
+      "path": "tests/loop.test.mjs",
+      "sha256": "3e59d56d38b2ca952d887ad94e5e7e3da307cec18a3a4f0a49ed213e2dbe7a4d"
     },
     {
       "path": "tests/probes.test.mjs",

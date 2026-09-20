@@ -38,7 +38,7 @@ Authority and scope:
 - Identify and back up the ACTIVE USER-OWNED host patch before changing it. Do not edit shipped preset directories or old deployment/source installations.
 - Compare existing plugin rows and visible orchestrator_* tools. Do not install duplicate tool registrations. If an older orchestrator collides, identify its exact row, ownership and rollback mapping; disable that old row only under my installation authority, with backup. If you cannot identify it reliably, stop instead of deleting or rewriting broadly.
 - Merge the generated root insertion into the existing patch without wholesale replacement or damage to unrelated rows. Follow the host's supported reload/restart behavior; do not start a replacement GUI server.
-- Verify the entry actually loads and the expected twelve orchestrator tools are visible. A file on disk, candidate YAML patch or successful doctor result is not runtime proof.
+- Verify the entry actually loads and the expected thirteen orchestrator tools are visible. A file on disk, candidate YAML patch or successful doctor result is not runtime proof.
 - Keep the backup and explain how the specific added row can be disabled or rolled back. Do not execute rollback unless required and authorized.
 
 4. Discover and qualify this machine's routes
