@@ -42,7 +42,7 @@ test('economy only explicit, no cross-pool fallback, reserve routes not silently
   assert.equal(select({}, [luna]).status, 'UNAVAILABLE');
   assert.equal(select({pool: 'economy'}, [luna]).route.id, 'codex-luna');
   assert.equal(select({risk: 'high'}, [qualification('codex-terra')]).status, 'UNAVAILABLE');
-  assert.equal(ROUTES.filter(r => r.pools.length === 0).length, 5);
+  assert.equal(ROUTES.filter(r => r.pools.length === 0).length, 4);
   assert.equal(ROUTES.find(r => r.id === 'deepseek-v4-pro').pricing, null);
   assert.equal(ROUTES.find(r => r.id === 'deepseek-v4-vision').pricing, null);
   assert.equal(POOL_PRIORITY['long-horizon'][0], 'claude-fable');
@@ -68,13 +68,34 @@ test('R05 requires actual image test, not inventory capability or role label', (
   assert.equal(select({role: 'R05'}, [{...q, imagePassed: true}]).status, 'UNAVAILABLE');
   assert.equal(select({role: 'R05'}, [{...q, imagePassed: true, caseResults: [...q.caseResults, {name: 'image', passed: true}]}]).status, 'SELECTED');
 });
+const attestation = (overrides = {}) => ({kind: 'operator-attestation', attestedBy: 'SYNTHETIC-OPERATOR', basis: 'Synthetic fixture attestation; not a real review.', dataClasses: ['public'], domainEvidence: false, ...overrides});
 test('domain roles require explicit domain evidence; smoke never claims role certification', () => {
   for (const role of ['R08', 'R09']) {
     assert.equal(select({role}, [qualification('codex-sol', 'advanced')]).reasons[0].reason, 'DOMAIN_EVIDENCE_REQUIRED');
-    const r = select({role}, [qualification('codex-sol', 'advanced', {domainEvidence: true})]);
+    const r = select({role}, [qualification('codex-sol', 'advanced', {domainEvidence: true, attestation: attestation({domainEvidence: true})})]);
     assert.equal(r.status, 'SELECTED'); assert.equal(r.qualificationLevel, 'smoke');
     assert.ok(r.warnings.includes('SMOKE_IS_NOT_ROLE_COMPETENCE_CERTIFICATION'));
   }
+});
+test('widened policy without a named attestation is refused as tampered', () => {
+  // The record claims domain evidence but carries no operator statement authorizing it.
+  assert.equal(select({role: 'R08'}, [qualification('codex-sol', 'advanced', {domainEvidence: true})]).reasons[0].reason, 'UNATTESTED_POLICY_WIDENING');
+  assert.equal(select({dataClass: 'confidential'}, [qualification('codex-terra', 'balanced', {allowedDataClasses: ['public', 'confidential']})]).reasons[0].reason, 'UNATTESTED_POLICY_WIDENING');
+  for (const broken of [{attestedBy: ''}, {basis: ''}, {kind: 'model-self-report'}]) {
+    const record = qualification('codex-terra', 'balanced', {allowedDataClasses: ['public', 'confidential'], attestation: attestation({dataClasses: ['public', 'confidential'], ...broken})});
+    assert.equal(select({dataClass: 'confidential'}, [record]).reasons[0].reason, 'UNATTESTED_POLICY_WIDENING');
+  }
+  // Base policy needs no attestation, so ordinary work is unaffected.
+  assert.equal(select({}, [qualification('codex-terra')]).status, 'SELECTED');
+});
+test('attested confidential work and the explicit vision pool select exactly', () => {
+  const confidential = qualification('codex-terra', 'balanced', {allowedDataClasses: ['public', 'internal', 'confidential'], attestation: attestation({dataClasses: ['public', 'internal', 'confidential']})});
+  assert.equal(select({dataClass: 'confidential'}, [confidential]).route.id, 'codex-terra');
+  const vision = qualification('deepseek-v4-vision', 'vision', {imagePassed: true, caseResults: [{name: 'text', passed: true}, {name: 'native-tool-roundtrip', passed: true}, {name: 'image', passed: true}]});
+  const r = select({pool: 'vision', role: 'R05'}, [vision]);
+  assert.equal(r.status, 'SELECTED'); assert.equal(r.route.id, 'deepseek-v4-vision'); assert.equal(r.reason, 'EXPLICIT_POOL');
+  // The vision route stays out of ordinary pools, so it is never a silent substitute.
+  assert.equal(select({role: 'R05'}, [vision]).status, 'UNAVAILABLE');
 });
 test('data class and extra capabilities need explicit evidence; no financial gate', () => {
   const q = qualification('codex-terra');

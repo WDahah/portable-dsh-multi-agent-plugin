@@ -1,28 +1,25 @@
 {
   "schemaVersion": 1,
-  "packageVersion": "1.0.0",
-  "buildId": "portable-multi-agent-1",
-  "origin": "Portable core from the current native multi-agent system",
-  "coreModuleCount": 7,
-  "integration": "host-injected factory",
-  "minimumNode": 22,
-  "sourceRuntimeTested": {
-    "node": "26.8.2",
-    "dshTools": "0.1.5-rc.2",
-    "cordisPeerRange": "^4.0.2"
-  },
   "files": [
     {
+      "path": ".gitattributes",
+      "sha256": "90fab223a2c6765dde57249cf558137f9e2bea2e51a0ad356d75626360a3d345"
+    },
+    {
       "path": ".github/workflows/ci.yml",
-      "sha256": "8656bcc1e38fad38510b7a328f843c15960c16d9ef70af6d4a73a47167416b7a"
+      "sha256": "7159f0f6ebb6ada72f0659c3ec05ed0c7035143b71a4a30fd7e0ace7ec88f618"
     },
     {
       "path": ".gitignore",
       "sha256": "553d50ded9bec05011154647b2073875051b313d9b0b669ad6d565777919e654"
     },
     {
+      "path": "CHANGELOG.md",
+      "sha256": "e890ed3dbe5a8c2cd3723f589c120ee7c77d7ae33e75e8aa6ba7a3bb8a85d003"
+    },
+    {
       "path": "CONTRIBUTING.md",
-      "sha256": "76ef6d55e44f1993568f6736a236cbb1cc11655afd4e7a39d582eb3e3c0d0ea0"
+      "sha256": "b423546233056e0505b4f391c9ca6a398b3b75ef8994e3d4cde8ede9a9f69468"
     },
     {
       "path": "INSTALL-WITH-AI.md",
@@ -34,7 +31,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "102a23cae49ebfdf782756018c73bd6348af878f0f67b5412f44ab24b6bea16d"
+      "sha256": "df9612a20b5a7ffec72668064235a3e5bb93a3a746b7f2a40c33b6bc1b639ea2"
     },
     {
       "path": "SECURITY.md",
@@ -54,11 +51,11 @@
     },
     {
       "path": "docs/SECURITY-AND-LIMITS.md",
-      "sha256": "9d771be5ada4b0772f8bb2cb9cb6ad92e8a9459dadd1234ba1af146baa490f5a"
+      "sha256": "c75c23b126c5daac94f8c98ecb396e58d036d7b4bf8a7a7ce35581a6c8b8fd73"
     },
     {
       "path": "docs/USAGE.md",
-      "sha256": "ec0a89a15471b6433d182529725b5049576ce3c876850591e97043b181e15e32"
+      "sha256": "8c0a85085ffdafaa93be36954263949179e4a83b3381176b67463c2bd2eb9733"
     },
     {
       "path": "examples/PROJECT-PROMPT.md",
@@ -74,11 +71,15 @@
     },
     {
       "path": "package.json",
-      "sha256": "8a65295884a77283867ae8dfe5e9a8b22487701032578fce17e79d559b631f85"
+      "sha256": "c20772a477f0aaadf640208dba42cbbba4473c5d770c92918baec5022bf327ce"
     },
     {
       "path": "scripts/doctor.mjs",
       "sha256": "11e6635eb6a43af6faac8ee9e7e3a4563037926cf39992e79313088d75b636e0"
+    },
+    {
+      "path": "scripts/manifest.mjs",
+      "sha256": "1557b04f7893331c3771f4e3e7554c62d738ab9c7a77e60f7e265c7c3b1b1075"
     },
     {
       "path": "scripts/setup.mjs",
@@ -106,15 +107,19 @@
     },
     {
       "path": "src/plugin.mjs",
-      "sha256": "95953001d4bbac4a01ce8229eb54c92ccb92feb7a5c8c8e0a2a5d9aeeb1684e1"
+      "sha256": "1ab4378168fe427b4753afa34852926c3f289fc23a32ae7d0bdffba1629640fc"
+    },
+    {
+      "path": "src/probes.mjs",
+      "sha256": "03717eef74d824ed0849e21b0f4d39465673173005aa92ee4d19e6df682db4ac"
     },
     {
       "path": "src/qualification.mjs",
-      "sha256": "91143f644e42f1092bf71ad88f6477f5bf2c2395963fa46c6081eaecfd6b1144"
+      "sha256": "04a8ad1a160791c165efe3971bbfaf3fd177b31f49a48dd77f492f0dca66678b"
     },
     {
       "path": "src/routes.mjs",
-      "sha256": "25cacb8d5486950684fa404aee5f00c452de395c92577b296679771f2f145389"
+      "sha256": "7abe3970cc1766da38e2bf4b676e0254147efb45a3aa5291016302727e7c74e5"
     },
     {
       "path": "tests/bridge.test.mjs",
@@ -122,7 +127,7 @@
     },
     {
       "path": "tests/core.test.mjs",
-      "sha256": "d8dec58f70f6996ee80b4d07fbdd1559d9cff6a39766c18a88f067c0d294b8b1"
+      "sha256": "6c206eac42793600be105b2fce2eb1c5e3b1229df5f472ffb3d78400d9c6bdf4"
     },
     {
       "path": "tests/diagnostic.test.mjs",
@@ -133,8 +138,12 @@
       "sha256": "3f7473aa496d8f03d5f8b0b95bebdbdcc7ab0029a6550d8cd5d8654671967492"
     },
     {
+      "path": "tests/probes.test.mjs",
+      "sha256": "9024384e346f0ab9a1f5cb676960fbcb36bded33d494d29528b88891859c97d0"
+    },
+    {
       "path": "tests/routes.test.mjs",
-      "sha256": "ce9c00192a0674e66ec8f56950e8adac5177c6cbad402c445505a84c5d12b70e"
+      "sha256": "7b6bacd2b8b164b88ac70177cf36f6a039c574d5d6ec24c5d5a39ac82eff52bd"
     },
     {
       "path": "tests/setup.test.mjs",

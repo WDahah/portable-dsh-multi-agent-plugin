@@ -1,0 +1,4 @@
+# The integrity manifest hashes exact bytes, so every listed file must check out
+# byte-identical on every platform. Normalizing line endings on checkout would
+# change those bytes and make `node scripts/verify.mjs` fail on Windows clones.
+* -text

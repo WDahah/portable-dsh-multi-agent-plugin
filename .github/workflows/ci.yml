@@ -9,15 +9,24 @@ permissions:
 
 jobs:
   verify:
-    name: Verify and test
-    runs-on: ubuntu-latest
+    name: Verify and test (${{ matrix.os }}, Node ${{ matrix.node }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows is required coverage: the integrity manifest hashes exact bytes, so a
+        # checkout that rewrote line endings would fail verification only on this leg.
+        os: [ubuntu-latest, windows-latest, macos-latest]
+        node: [22, 24]
     steps:
       - name: Check out repository
         uses: actions/checkout@v4
       - name: Set up Node.js
         uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: ${{ matrix.node }}
+      - name: Confirm the committed manifest matches these files
+        run: node scripts/manifest.mjs --check
       - name: Verify package integrity
         run: node scripts/verify.mjs
       - name: Run tests

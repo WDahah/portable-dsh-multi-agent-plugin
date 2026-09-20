@@ -7,7 +7,7 @@ Use these tools **inside the compatible running DSH host**, after activation and
 | Tool | Purpose |
 |---|---|
 | `orchestrator_inventory` | Read configured routes and owner/session qualification evidence; no inference |
-| `orchestrator_qualify` | Real bounded child-agent text/tool challenge for exact `route_id` and `effort` |
+| `orchestrator_qualify` | Real bounded child-agent text/tool challenge for exact `route_id` and `effort`, plus optional capability probes and an operator attestation |
 | `orchestrator_qualification_echo` | Internal active-challenge helper; no filesystem/network capability |
 | `orchestrator_delegate` | Select a qualified route and run a scoped native child agent |
 | `orchestrator_delegate_read` | Read saved assignment output without restarting it |
@@ -51,6 +51,33 @@ Call `orchestrator_plan` with `task`, unique `task_id`, `prompt`, and optionally
 
 Inspect terminal status, selected route/effort, round count, saved text and accounting. A successful stop is not semantic acceptance of code. Run project-specific tests under the project's permissions. Raw continuation aggregation may join adjacent lines/words; preserve round boundaries when checking exact output.
 
-Qualification is owner/session-scoped for **24 hours**. New sessions/projects must establish their own evidence; expired evidence requires a fresh exact probe. Probes can consume paid/subscription quota and are not included in `npm test`. A failed route remains unavailable; do not forge a pass or silently alias another model. R05 image and R08/R09 specialist-domain requests remain blocked by basic smoke-only evidence.
+Qualification is owner/session-scoped for **24 hours**. New sessions/projects must establish their own evidence; expired evidence requires a fresh exact probe. Probes can consume paid/subscription quota and are not included in `npm test`. A failed route remains unavailable; do not forge a pass or silently alias another model. Basic smoke alone still does not admit image, specialist-domain, or confidential work: each needs the extra evidence described next.
+
+## Capability probes and operator attestations
+
+Basic smoke verifies text and a native tool round trip. Two further capabilities are **machine-probed** by asking for `capabilities` on `orchestrator_qualify`:
+
+```json
+{"route_id": "codex-terra", "effort": "medium", "capabilities": ["image", "structured-output"]}
+```
+
+- `image` sends generated solid-color PNGs through the host attachment service and requires the exact colors back, so guessing, refusing, or describing the request fails. This is what `R05` and any `capabilities:["image"]` task require. The host must provide an `attachments` service; without it the probe fails rather than claiming support.
+- `structured-output` requires one exact JSON object matching a per-probe nonce. Prose, a code fence, or a wrong field fails.
+
+Each probe runs as its own bounded child **after** the core smoke passes, so a failed capability never invalidates the base result — and never repairs one.
+
+Specialist-domain competence and data confidentiality are **not machine-testable here**, so they are recorded as an explicit operator statement instead of being inferred:
+
+```json
+{"route_id": "codex-sol", "effort": "high",
+ "attestation": {"dataClasses": ["public", "internal", "confidential"],
+                 "domainEvidence": true,
+                 "attestedBy": "your name or team",
+                 "basis": "what you actually reviewed or ran"}}
+```
+
+Any widening beyond `public`/`internal`, or any `domainEvidence`, **requires** both `attestedBy` and `basis`; a malformed attestation is refused before a child starts. Selection rejects a stored record whose policy exceeds ordinary smoke without one (`UNATTESTED_POLICY_WIDENING`). An attestation is a reviewable human claim with an author — it is **not** a capability proof, an entitlement check, or a confidentiality guarantee, and it cannot substitute for a probe result.
+
+The dedicated vision route is reachable only through an explicit `"pool": "vision"`, and still requires a passed image probe. Ordinary image work routes through the normal pools once those routes pass the image probe.
 
 The $1 target is informational, not a financial stop or permission override. API costs may be historical estimates; native/subscription totals may be unknown. Never interpret `costUnknown:true` plus zero known-cost subtotal as free execution.

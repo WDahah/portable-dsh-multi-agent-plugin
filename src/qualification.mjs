@@ -1,8 +1,14 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import {createHash, randomUUID} from 'node:crypto';
+import {createImageProbe, createStructuredProbe} from './probes.mjs';
 
 export const BUILD_ID = 'portable-multi-agent-1';
+// Ordinary smoke admits these; anything stricter needs an operator attestation whose
+// authority this plugin cannot manufacture from a model's own output.
+export const BASE_DATA_CLASSES = Object.freeze(['public', 'internal']);
+export const ATTESTABLE_DATA_CLASSES = Object.freeze(['public', 'internal', 'confidential', 'restricted']);
+export const CAPABILITY_PROBES = Object.freeze(['image', 'structured-output']);
 const sha = value => createHash('sha256').update(value).digest('hex');
 export const keyOf = value => 'x' + sha(value);
 export function need(value, code = 'BRIDGE_REFUSED') {if (!value) throw Object.assign(new Error(code), {code});}
@@ -83,7 +89,27 @@ export function visibleOutput(output) {
   }
   return text;
 }
-export function createQualificationManager({root, owner, getLlm, getSubagents, clock = Date.now, deadlineMs = 180000}) {
+const nonempty = (value, max = 256) => typeof value === 'string' && value.trim().length > 0 && value.length <= max;
+/** Validate an operator attestation. Absent is normal; malformed is refused outright so
+ * a typo silently widens nothing. This records a human claim; it proves no capability. */
+export function normalizeAttestation(input) {
+  if (input === undefined || input === null) return null;
+  need(typeof input === 'object' && !Array.isArray(input), 'INVALID_ATTESTATION');
+  const dataClasses = input.dataClasses ?? [...BASE_DATA_CLASSES];
+  need(Array.isArray(dataClasses) && dataClasses.length > 0 && new Set(dataClasses).size === dataClasses.length &&
+    dataClasses.every(c => ATTESTABLE_DATA_CLASSES.includes(c)), 'INVALID_ATTESTED_DATA_CLASS');
+  // Every widening must name a responsible human and a reviewable basis.
+  const widens = dataClasses.some(c => !BASE_DATA_CLASSES.includes(c)) || input.domainEvidence === true;
+  need(!widens || (nonempty(input.attestedBy) && nonempty(input.basis, 2000)), 'ATTESTATION_AUTHOR_AND_BASIS_REQUIRED');
+  need(input.domainEvidence === undefined || typeof input.domainEvidence === 'boolean', 'INVALID_ATTESTATION');
+  return {
+    dataClasses: [...dataClasses], domainEvidence: input.domainEvidence === true,
+    attestedBy: nonempty(input.attestedBy) ? input.attestedBy.trim() : null,
+    basis: nonempty(input.basis, 2000) ? input.basis.trim() : null,
+    kind: 'operator-attestation',
+  };
+}
+export function createQualificationManager({root, owner, getLlm, getSubagents, getAttachments, clock = Date.now, deadlineMs = 180000}) {
   const store = createRecordStore(root, owner, 'qualifications'), challenges = new Map(), busy = new Set(), controllers = new Set();
   need(Number.isSafeInteger(deadlineMs) && deadlineMs > 0 && deadlineMs <= 180000, 'INVALID_DEADLINE');
   const runtimeId = randomUUID(); let disposed = false;
@@ -93,13 +119,44 @@ export function createQualificationManager({root, owner, getLlm, getSubagents, c
     c.calls.push(exec.agent.id); need(c.calls.length === 1, 'CHALLENGE_ALREADY_USED');
     return {marker: c.marker};
   }
-  async function qualify(route, effort, exec) {
+  /** One bounded child per capability. A probe never upgrades the base smoke result:
+   * it can only add its own case, so a failed core probe cannot be rescued here. */
+  async function runCapabilityProbe(capability, route, effort, config, exec, scope, subagents) {
+    const probe = capability === 'image' ? createImageProbe() : createStructuredProbe();
+    let run;
+    try {
+      const prompt = [{type: 'text', text: probe.instruction}];
+      // Images ride as content blocks; the host attachment service owns durable storage.
+      if (capability === 'image') {
+        const attachments = getAttachments?.();
+        need(attachments && typeof attachments.saveImage === 'function', 'IMAGE_ATTACHMENTS_UNAVAILABLE');
+        for (const image of probe.images) {
+          const attachment = await attachments.saveImage({data: image.data, mediaType: image.mediaType, name: image.name});
+          prompt.push({type: 'image', attachment});
+        }
+      }
+      run = await subagents.start('spawn', {parent: exec.agent, signal: scope.signal,
+        label: `Route qualification (${capability})`, agentOptions: config, maxDepth: 1,
+        toolFilter: {allow: []},
+        persona: 'Answer only the bounded capability probe. Do not delegate or use tools.',
+        prompt});
+      const result = await run.result; scope.signal.throwIfAborted();
+      return result.stopReason === 'completed' && probe.verify(visibleOutput(result.output));
+    } catch {return false;}
+    finally {if (run) {try {await run.dispose();} catch { /* Probe already scored; disposal failure cannot pass it. */ }}}
+  }
+  async function qualify(route, effort, exec, options = {}) {
     need(!disposed && exec.agent?.id === owner, 'OWNER_REFUSED');
     need(route && typeof route.provider === 'string' && typeof route.model === 'string' && typeof effort === 'string');
+    const capabilities = options.capabilities ?? [];
+    need(Array.isArray(capabilities) && capabilities.every(c => CAPABILITY_PROBES.includes(c)) &&
+      new Set(capabilities).size === capabilities.length, 'UNKNOWN_CAPABILITY_PROBE');
+    const attestation = normalizeAttestation(options.attestation);
     const key = keyOf(route.provider + '\0' + route.model + '\0' + effort);
     need(!busy.has(key) && busy.size < 2, 'QUALIFICATION_BUSY'); exec.signal.throwIfAborted();
     const scope = scopedSignal(exec.signal, deadlineMs); busy.add(key); controllers.add(scope.controller);
     let run, token, childId = null, stopReason = 'error', textPassed = false, toolPassed = false, transportPassed = false, revision;
+    const probed = new Map();
     const issuedAt = clock();
     try {
       const previous = await store.read(key); revision = previous?.revision || 0;
@@ -119,19 +176,35 @@ export function createQualificationManager({root, owner, getLlm, getSubagents, c
       const text = visibleOutput(result.output).trim();
       transportPassed = stopReason === 'completed'; textPassed = transportPassed && text === `QUALIFIED:${marker}:42`;
       toolPassed = transportPassed && challenge.calls.length === 1 && challenge.calls[0] === childId;
+      if (run) {await run.dispose(); run = undefined;}
+      // Only probe once the core smoke passed: extra capability evidence on an
+      // unusable route would be recorded but could never be selected.
+      if (transportPassed && textPassed && toolPassed) {
+        for (const capability of capabilities) {
+          scope.signal.throwIfAborted();
+          probed.set(capability, await runCapabilityProbe(capability, route, effort, config, exec, scope, subagents));
+        }
+      }
     } catch {stopReason = scope.signal.aborted ? 'aborted' : 'error';}
     finally {
       if (token) challenges.delete(token);
       if (run) {try {await run.dispose();} catch {stopReason = 'error'; transportPassed = false; toolPassed = false; textPassed = false;}}
       scope.close(); controllers.delete(scope.controller);
     }
+    const caseResults = [{name: 'text', passed: textPassed}, {name: 'native-tool-roundtrip', passed: toolPassed}];
+    for (const capability of capabilities) caseResults.push({name: capability, passed: probed.get(capability) === true});
+    // An attestation is an operator statement recorded with its author, never a model
+    // self-report: it widens policy only, and cannot fabricate a machine probe result.
+    const attested = attestation && transportPassed && textPassed && toolPassed ? attestation : null;
     const record = {schemaVersion: 1, qualificationType: 'smoke', issuer: {kind: 'plugin-service', service: 'orchestration-v3', runtimeId},
       runtimeBuildId: BUILD_ID, adapterFingerprint: sha(route.provider + '\0' + route.model + '\0' + BUILD_ID),
       provider: route.provider, model: route.model, effort, issuedAt, expiresAt: issuedAt + 86400000,
       durationMs: Math.max(0, Math.floor(clock() - issuedAt)), available: transportPassed && textPassed && toolPassed,
-      transportPassed, textPassed, toolPassed, imagePassed: false,
-      caseResults: [{name: 'text', passed: textPassed}, {name: 'native-tool-roundtrip', passed: toolPassed}],
-      allowedDataClasses: ['public', 'internal'], domainEvidence: false};
+      transportPassed, textPassed, toolPassed, imagePassed: probed.get('image') === true,
+      caseResults,
+      allowedDataClasses: attested ? [...attested.dataClasses] : [...BASE_DATA_CLASSES],
+      domainEvidence: attested ? attested.domainEvidence : false,
+      attestation: attested};
     try {
       need(revision !== undefined, 'QUALIFICATION_STORAGE_UNAVAILABLE');
       await store.save(key, record, revision);

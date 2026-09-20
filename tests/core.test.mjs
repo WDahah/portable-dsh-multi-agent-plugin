@@ -22,7 +22,26 @@ test('portable factory injects native definition adapter, mounts nine tools, and
   const h=context();plugin.apply(h.ctx,{stateRoot:fresh()});assert.equal(h.tools.size,9);
   const inventory=await h.tools.get('orchestrator_inventory').execute({},exec());assert.equal(inventory.enabled,false);assert.equal(inventory.build_id,'portable-multi-agent-1');assert.equal(inventory.approval_required,false);assert.equal(inventory.hard_budget_cap,false);assert.deepEqual(inventory.qualifications,[]);
   assert.equal(h.tools.get('orchestrator_plan').timeoutMs,60000);assert.equal(h.tools.get('orchestrator_run').timeoutMs,910000);
-  const refused=await h.tools.get('orchestrator_qualify').execute({route_id:'codex-terra',effort:'medium'},exec());assert.equal(refused.status,'BRIDGE_REFUSED_OR_FAILED');h.dispose();assert.equal(h.tools.size,0);
+  const refused=await h.tools.get('orchestrator_qualify').execute({route_id:'codex-terra',effort:'medium'},exec());assert.equal(refused.status,'BRIDGE_REFUSED_OR_FAILED');assert.equal(refused.reason,'DISABLED');h.dispose();assert.equal(h.tools.size,0);
+});
+test('refusals name an actionable cause without leaking provider or path detail',async()=>{
+  const h=context({llm:{listProviders:()=>[],prepareCall(){throw Object.assign(new Error('https://provider.example/v1 key sk-secret'),{code:'SECRET_TOKEN_LEAK',status:401});}}});
+  createPlugin(defineTool).apply(h.ctx,{stateRoot:fresh(),enabled:true});
+  const cases=[['orchestrator_qualify',{route_id:'no-such-route',effort:'medium'},'UNKNOWN_ROUTE'],
+    ['orchestrator_qualify',{route_id:'codex-terra',effort:'not-an-effort'},'EFFORT_NOT_IN_ROUTE_POLICY'],
+    ['orchestrator_qualify',{route_id:'codex-terra',effort:'medium',capabilities:['telepathy']},'UNKNOWN_CAPABILITY_PROBE'],
+    ['orchestrator_delegate_read',{run_id:'../escape'},'INVALID_RUN_ID'],
+    ['orchestrator_read',{task_id:'absent'},'UNKNOWN_TASK']];
+  for(const [tool,args,expected] of cases){
+    const result=await h.tools.get(tool).execute(args,exec());
+    assert.equal(result.status,'BRIDGE_REFUSED_OR_FAILED');assert.equal(result.reason,expected);assert.equal(result.details_redacted,true);
+  }
+  // A provider failure is recorded as an unavailable route, never surfaced as raw text.
+  const probed=await h.tools.get('orchestrator_qualify').execute({route_id:'codex-terra',effort:'medium'},exec());
+  assert.equal(probed.qualification.available,false);assert.equal(probed.stop_reason,'error');
+  const serialized=JSON.stringify(probed);
+  assert.equal(serialized.includes('sk-secret'),false);assert.equal(serialized.includes('provider.example'),false);assert.equal(serialized.includes('SECRET_TOKEN_LEAK'),false);
+  h.dispose();
 });
 test('plugin rejects relative state root and invalid enabled values',()=>{const p=createPlugin(defineTool);assert.throws(()=>p.apply(context().ctx,{stateRoot:'relative'}));assert.throws(()=>p.apply(context().ctx,{stateRoot:fresh(),enabled:'true'}));});
 test('lifetime disposal cancels active tool without aborting parent',async()=>{

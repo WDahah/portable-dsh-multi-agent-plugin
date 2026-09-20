@@ -11,9 +11,14 @@ Read [START-HERE.md](START-HERE.md) and [Security and limits](docs/SECURITY-AND-
 Use Node.js 22 or newer. From the repository root, run:
 
 ```sh
+node scripts/manifest.mjs --check
 node scripts/verify.mjs
 npm test
 ```
+
+**When you add, remove, or change any packaged file, regenerate the integrity manifest** with `node scripts/manifest.mjs`, then review the diff and re-run `verify`. CI runs `--check` on Linux, Windows, and macOS, so a stale manifest fails the build. Regenerating is the supported way to update the manifest for a reviewed change; it is not a way to paper over an unexpected one.
+
+Never disable the line-ending rules in `.gitattributes`. The manifest hashes exact bytes, so a checkout that translates line endings makes verification fail for everyone on that platform.
 
 Do not commit `.local/`, `node_modules/`, state directories, credentials, provider settings, or generated machine-local files.
 
