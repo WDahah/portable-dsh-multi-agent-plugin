@@ -1,4 +1,6 @@
 import {randomUUID} from 'node:crypto';
+import fsp from 'node:fs/promises';
+import path from 'node:path';
 import {createJournal, diskId, digest, need, normalizeRequest, normalizeUsage, MAX_VISIBLE} from './journal.mjs';
 
 export const HARD_MS=900000;
@@ -25,14 +27,44 @@ export function createTaskEngine({root,owner,getLlm,clock=Date.now,deadlineMs=HA
     provider:x.route?.provider??r.request.route.provider,model:x.route?.model??r.request.route.model,effort:x.route?.effort??r.request.route.effort,
     routeRecordedPerRound:x.route!==undefined})),
     route:{provider:r.request.route.provider,model:r.request.route.model,effort:r.request.route.effort,maxTokens:r.request.route.maxTokens},
+    // The original request travels with the result so a saved task can be audited for
+    // what was asked, not only for what the model returned.
+    prompt:r.request.prompt,
     diagnosticPersisted:false,diagnostics:diagnosticView(r)};}
   async function save(r,status,emergency=false){const d=diagnostics.get(r)?.at(-1),previous=d?.phase;if(d)d.phase='checkpoint';need(!r.persistenceFailed,'PERSISTENCE_FAILED');need(r.revision<(emergency?1024:1023),'REVISION_LIMIT');r.status=status;account(r);const {persistenceFailed,...owned}=r;try{const saved=await journal.save(r.task,{...owned,revision:r.revision+1},r.revision);Object.assign(r,saved);if(d)d.phase=previous;}catch(error){r.persistenceFailed=true;throw error;}}
   async function load(id){checkId(id);if(loaded.has(id))return loaded.get(id);need(loaded.size<64,'TASK_CAPACITY');const r=await journal.load(diskId(id));need(r,'UNKNOWN_TASK');if(loaded.has(id))return loaded.get(id);loaded.set(id,r);return r;}
   async function exclusive(id,fn){checkId(id);need(!busy.has(id),'CONCURRENT_TASK');busy.add(id);try{return await fn();}finally{busy.delete(id);}}
+  // Task directories are named by digest, so a readable id cannot be recovered from
+  // storage. This side index maps one back without touching the closed record schema. It
+  // is a convenience only: a task missing from it still lists, with a null id.
+  const indexFile=()=>path.join(root,diskId(owner),'task-index.json');
+  async function readIndex(){
+    try{
+      const parsed=JSON.parse(await fsp.readFile(indexFile(),'utf8'));
+      return parsed&&typeof parsed==='object'&&!Array.isArray(parsed)?parsed:{};
+    }catch{return {};}
+  }
+  async function noteId(taskId){
+    try{
+      const index=await readIndex();
+      if(index[diskId(taskId)]===taskId)return;
+      index[diskId(taskId)]=taskId;
+      await fsp.mkdir(path.dirname(indexFile()),{recursive:true,mode:0o700});
+      await fsp.writeFile(indexFile(),JSON.stringify(index),{encoding:'utf8',mode:0o600});
+    }catch{ /* Never fail a task because a lookup hint could not be written. */ }
+  }
+  async function dropId(taskId){
+    try{
+      const index=await readIndex();
+      if(!(diskId(taskId) in index))return;
+      delete index[diskId(taskId)];
+      await fsp.writeFile(indexFile(),JSON.stringify(index),{encoding:'utf8',mode:0o600});
+    }catch{ /* Losing a hint is harmless once the record itself is gone. */ }
+  }
   async function plan({task_id,prompt,route,maxRounds=3,contextChars=160000,deadlineMs:taskMs=deadlineMs}){return exclusive(task_id,async()=>{
     need(!disposed,'DISPOSED');need(!loaded.has(task_id)&&loaded.size<64,'TASK_EXISTS_OR_CAPACITY');need(!(await journal.load(diskId(task_id))),'TASK_EXISTS');need(integer(taskMs)&&taskMs>0&&taskMs<=deadlineMs,'INVALID_DEADLINE');
     const createdAt=clock();const request=normalizeRequest({prompt,route,maxRounds,contextChars,createdAt,deadlineAt:createdAt+taskMs});
-    const r={version:3,owner:diskId(owner),task:diskId(task_id),revision:0,status:'PLANNED',request,requestHash:digest(JSON.stringify(request)),rounds:[],spentMicros:0,heldMicros:0,costUnknown:false};loaded.set(task_id,r);await save(r,'PLANNED');return view(task_id,r);
+    const r={version:3,owner:diskId(owner),task:diskId(task_id),revision:0,status:'PLANNED',request,requestHash:digest(JSON.stringify(request)),rounds:[],spentMicros:0,heldMicros:0,costUnknown:false};loaded.set(task_id,r);await save(r,'PLANNED');await noteId(task_id);return view(task_id,r);
   });}
   async function run(id,exec){caller(exec);return exclusive(id,async()=>{
     const r=await load(id);caller(exec);need(!r.persistenceFailed,'PERSISTENCE_FAILED');
@@ -94,5 +126,34 @@ export function createTaskEngine({root,owner,getLlm,clock=Date.now,deadlineMs=HA
     }
     return view(id,r);
   });}
-  return Object.freeze({plan,run,resume:run,async read(taskId,page=0){need(!disposed,'DISPOSED');const r=await load(taskId);if(['ATTEMPT_COMMITTED','RUNNING'].includes(r.status)&&!busy.has(taskId))return {...view(taskId,r,page),status:'INTERRUPTED_UNCERTAIN',resumable:false};return view(taskId,r,page);},dispose(){disposed=true;for(const controller of controllers)controller.abort(new DOMException('Engine disposed','AbortError'));}});
+  /** Summaries of every stored task, newest first. A task whose readable id is unknown is
+   * still listed with a null id and its digest, so nothing is silently hidden. */
+  async function list(){
+    need(!disposed,'DISPOSED');
+    const index=await readIndex();
+    const stored=await journal.tasks();
+    return stored.map(({task,record})=>({
+      task_id:index[task]??null,digest:task,
+      status:record?record.status:'UNREADABLE',
+      roundCount:record?record.rounds.length:0,maxRounds:record?record.request.maxRounds:null,
+      provider:record?record.request.route.provider:null,model:record?record.request.route.model:null,
+      effort:record?record.request.route.effort:null,
+      spentMicros:record?record.spentMicros:null,costUnknown:record?record.costUnknown:null,
+      createdAt:record?record.request.createdAt:null,deadlineAt:record?record.request.deadlineAt:null,
+      totalChars:record?record.rounds.reduce((n,x)=>n+x.visibleText.length,0):0,
+      resumable:record?SAFE.includes(record.status)&&clock()<record.request.deadlineAt:false,
+    })).sort((a,b)=>(b.createdAt??0)-(a.createdAt??0));
+  }
+  /** Delete one saved task. A task currently running is refused rather than deleted
+   * beneath itself, and the in-memory copy is dropped so a stale record cannot be reused. */
+  async function forget(taskId){
+    need(!disposed,'DISPOSED');checkId(taskId);
+    need(!busy.has(taskId),'CONCURRENT_TASK');
+    const removed=await journal.remove(diskId(taskId));
+    need(removed,'UNKNOWN_TASK');
+    loaded.delete(taskId);
+    await dropId(taskId);
+    return {task_id:taskId,removed:true};
+  }
+  return Object.freeze({plan,run,resume:run,list,forget,async read(taskId,page=0){need(!disposed,'DISPOSED');const r=await load(taskId);if(['ATTEMPT_COMMITTED','RUNNING'].includes(r.status)&&!busy.has(taskId))return {...view(taskId,r,page),status:'INTERRUPTED_UNCERTAIN',resumable:false};return view(taskId,r,page);},dispose(){disposed=true;for(const controller of controllers)controller.abort(new DOMException('Engine disposed','AbortError'));}});
 }

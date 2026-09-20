@@ -33,6 +33,8 @@ Capability probes consume real quota like any other probe. An image probe writes
 
 Original prompts and visible outputs are **plaintext** in the state directory. Restrict filesystem access, minimize sensitive content and choose a fresh absolute private directory. Do not copy task/qualification state to manufacture readiness elsewhere. Checksums detect corruption, not a malicious writer who controls the directory.
 
+Nothing prunes stored records automatically: assignments, direct tasks, and qualification evidence persist until you remove them, including evidence that has already expired. Use `orchestrator_list` to see what is held and `orchestrator_forget` to delete it. Deletion is permanent, refuses a record that is currently in flight, and is the only way to clear plaintext prompts and outputs from a state directory that keeps growing.
+
 State directories and files are created with POSIX modes `0700`/`0600`. **Windows ignores those modes**, so the state directory inherits the parent folder's ACL instead. On Windows, place it outside shared or synchronized locations and restrict it explicitly, for example:
 
 ```powershell

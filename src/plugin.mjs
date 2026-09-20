@@ -14,7 +14,8 @@ const REFUSAL_REASONS = new Set(['DISABLED', 'OWNER_REQUIRED', 'OWNER_CAPACITY',
   'ASSIGNMENT_ALREADY_EXISTS', 'UNKNOWN_ASSIGNMENT', 'UNKNOWN_TASK', 'INVALID_RUN_ID', 'INVALID_TASK_ID',
   'INVALID_PROMPT', 'INVALID_TOOL_FILTER', 'INVALID_TECHNICAL_LIMIT', 'INVALID_MAX_TOKENS', 'INVALID_OFFSET',
   'INVALID_PAGE', 'INVALID_ROUTE', 'MISSING_SERVICE', 'SUBAGENTS_UNAVAILABLE', 'LLM_UNAVAILABLE',
-  'PERSISTENCE_FAILED', 'INVALID_CHALLENGE', 'CHALLENGE_ALREADY_USED']);
+  'PERSISTENCE_FAILED', 'INVALID_CHALLENGE', 'CHALLENGE_ALREADY_USED',
+  'UNKNOWN_LIST_KIND', 'SPECIFY_EXACTLY_ONE_TARGET', 'QUALIFICATIONS_EXPIRED_OR_ALL']);
 const refusalReason = error => typeof error?.code === 'string' && REFUSAL_REASONS.has(error.code) ? error.code : 'UNAVAILABLE';
 
 /** Inject the installed host's native defineTool; this package does not vendor DSH. */
@@ -89,6 +90,35 @@ export function createPlugin(defineTool) {
       }, 910000);
     register('orchestrator_delegate_read', 'Read immutable child-assignment output; never restarts the child.',
       {run_id: {type: 'string', required: true}, offset: {type: 'integer'}}, (args, exec) => owned(exec).agents.read(args.run_id, args.offset ?? 0));
+    register('orchestrator_list', 'List saved assignments, direct tasks and qualification evidence for this owner; summaries only, no stored output or provider call.',
+      {kind: {type: 'string'}}, async (args, exec) => {
+        const kind = args.kind ?? 'all';
+        need(['all', 'assignments', 'tasks', 'qualifications'].includes(kind), 'UNKNOWN_LIST_KIND');
+        const entry = owned(exec), now = Date.now(), result = {kind};
+        if (kind === 'all' || kind === 'assignments') result.assignments = await entry.agents.list();
+        if (kind === 'all' || kind === 'tasks') result.tasks = await entry.engine.list();
+        if (kind === 'all' || kind === 'qualifications') {
+          result.qualifications = (await entry.qualifications.list()).map(record => ({
+            provider: record.provider, model: record.model, effort: record.effort,
+            available: record.available, issuedAt: record.issuedAt, expiresAt: record.expiresAt,
+            expired: record.expiresAt <= now, imagePassed: record.imagePassed, domainEvidence: record.domainEvidence,
+            allowedDataClasses: [...record.allowedDataClasses]}));
+        }
+        return result;
+      });
+    register('orchestrator_forget', 'Permanently delete saved records this owner no longer needs. Prompts and outputs are stored in plaintext, so removal is the only way to clear them. In-flight work is refused, never deleted beneath itself.',
+      {run_id: {type: 'string'}, task_id: {type: 'string'}, qualifications: {type: 'string'}}, async (args, exec) => {
+        const entry = owned(exec), result = {};
+        const wanted = ['run_id', 'task_id', 'qualifications'].filter(key => args[key] !== undefined);
+        need(wanted.length === 1, 'SPECIFY_EXACTLY_ONE_TARGET');
+        if (args.run_id !== undefined) result.assignment = await entry.agents.forget(args.run_id);
+        if (args.task_id !== undefined) result.task = await entry.engine.forget(args.task_id);
+        if (args.qualifications !== undefined) {
+          need(['expired', 'all'].includes(args.qualifications), 'QUALIFICATIONS_EXPIRED_OR_ALL');
+          result.qualifications = await entry.qualifications.forget({expiredOnly: args.qualifications === 'expired'});
+        }
+        return result;
+      });
   }
   };
 }

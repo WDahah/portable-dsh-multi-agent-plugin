@@ -2,7 +2,7 @@
 
 Use these tools **inside the compatible running DSH host**, after activation and fresh qualification in the same root agent session. Tool notation below is illustrative; invoke the actual registered tool, not a made-up shell command.
 
-## The nine tools
+## The eleven tools
 
 | Tool | Purpose |
 |---|---|
@@ -15,6 +15,28 @@ Use these tools **inside the compatible running DSH host**, after activation and
 | `orchestrator_run` | Run that direct task, including safe bounded continuation |
 | `orchestrator_read` | Read saved direct output/accounting |
 | `orchestrator_resume` | Resume only an engine-approved safe state; never uncertain replay |
+| `orchestrator_list` | List saved assignments, tasks and qualification evidence; summaries only |
+| `orchestrator_forget` | Permanently delete one saved assignment or task, or qualification evidence |
+
+## Finding and clearing saved state
+
+Saved records persist until you remove them, and prompts and outputs are stored in plaintext, so deletion is the only way to clear them.
+
+`orchestrator_list` returns summaries — never the saved output text — for `assignments`, `tasks`, and `qualifications`, newest first. Pass `kind` to narrow it. Use it when you have lost a `run_id` or `task_id`: without one, a saved record cannot be read even though it remains on disk.
+
+A direct task's readable id is kept in a small side index beside the journal, because task directories are named by digest. If that index is missing, the task still lists with `task_id: null` and its `digest`, rather than being hidden.
+
+`orchestrator_forget` takes **exactly one** target:
+
+```json
+{"run_id": "project-inspect-001"}
+{"task_id": "report-draft"}
+{"qualifications": "expired"}
+```
+
+`qualifications` accepts `expired` (prune only lapsed evidence) or `all`. Deletion is permanent and is refused while that exact run or task is in flight, so a forget cannot strand work mid-write. A forgotten id becomes available again — deletion leaves no tombstone.
+
+`orchestrator_read` and `orchestrator_delegate_read` also return the original `prompt`, so a saved record shows what was asked, not only what came back.
 
 ## Task metadata and a first assignment
 

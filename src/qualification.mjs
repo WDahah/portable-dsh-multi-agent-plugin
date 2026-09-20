@@ -70,15 +70,28 @@ export function createRecordStore(root, owner, namespace) {
     try {await handle.writeFile(encoded); await handle.sync();} finally {await handle.close();}
     return body.revision;
   }
-  async function list() {
+  async function entries() {
     if (!await safeDirectory(base)) return [];
-    const entries = await fs.readdir(base, {withFileTypes: true});
-    need(entries.length <= 256 && entries.every(e => e.isDirectory() && !e.isSymbolicLink() && /^x[a-f0-9]{64}$/.test(e.name)), 'CORRUPT_JOURNAL');
+    const found = await fs.readdir(base, {withFileTypes: true});
+    need(found.length <= 256 && found.every(e => e.isDirectory() && !e.isSymbolicLink() && /^x[a-f0-9]{64}$/.test(e.name)), 'CORRUPT_JOURNAL');
     const records = [];
-    for (const entry of entries) {const value = await read(entry.name); if (value) records.push(value.data);}
+    for (const entry of found) {const value = await read(entry.name); if (value) records.push({key: entry.name, revision: value.revision, data: value.data});}
     return records;
   }
-  return {read, save, list};
+  async function list() {
+    return (await entries()).map(entry => entry.data);
+  }
+  /** Delete one record's whole revision directory. Validates the key and refuses a linked
+   * path exactly as read and save do, so deletion cannot escape this owner's namespace. */
+  async function remove(key) {
+    const directory = location(key);
+    if (!await safeDirectory(directory)) return false;
+    const entries = await fs.readdir(directory, {withFileTypes: true});
+    need(entries.every(e => e.isFile() && !e.isSymbolicLink() && /^\d{8}\.json$/.test(e.name)), 'CORRUPT_JOURNAL');
+    await fs.rm(directory, {recursive: true, force: true});
+    return true;
+  }
+  return {read, save, list, entries, remove};
 }
 export function visibleOutput(output) {
   need(Array.isArray(output), 'INVALID_CHILD_OUTPUT');
@@ -212,9 +225,30 @@ export function createQualificationManager({root, owner, getLlm, getSubagents, g
       return {qualification: record, child_id: childId, stop_reason: stopReason, cost_unknown: true, provider_usage_available: false};
     } finally {busy.delete(key);}
   }
-  return {qualify, echo, async list() {
-    const records = await store.list();
-    return records.filter(record => record?.schemaVersion === 1 && record.runtimeBuildId === BUILD_ID &&
-      record.adapterFingerprint === sha(record.provider + '\0' + record.model + '\0' + BUILD_ID));
+  const usable = record => record?.schemaVersion === 1 && record.runtimeBuildId === BUILD_ID &&
+    record.adapterFingerprint === sha(record.provider + '\0' + record.model + '\0' + BUILD_ID);
+  /** Delete stored evidence. Expired records are removed by default; an exact route and
+   * effort removes one record whether or not it has expired. A probe in flight for that
+   * route is refused rather than deleted beneath itself. */
+  async function forget({route, effort, expiredOnly = true} = {}) {
+    need(!disposed, 'DISPOSED');
+    const now = clock();
+    const removed = [];
+    for (const entry of await store.entries()) {
+      const record = entry.data;
+      if (!usable(record)) continue;
+      if (route) {
+        if (record.provider !== route.provider || record.model !== route.model) continue;
+        if (effort !== undefined && record.effort !== effort) continue;
+      } else if (expiredOnly && record.expiresAt > now) continue;
+      const key = keyOf(record.provider + '\0' + record.model + '\0' + record.effort);
+      need(!busy.has(key), 'QUALIFICATION_BUSY');
+      await store.remove(entry.key);
+      removed.push({provider: record.provider, model: record.model, effort: record.effort, expiresAt: record.expiresAt, expired: record.expiresAt <= now});
+    }
+    return {removed, count: removed.length};
+  }
+  return {qualify, echo, forget, async list() {
+    return (await store.list()).filter(usable);
   }, dispose() {disposed = true; for (const controller of controllers) controller.abort(); challenges.clear();}};
 }

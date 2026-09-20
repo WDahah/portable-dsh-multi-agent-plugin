@@ -85,6 +85,9 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
       rounds: record.rounds.map(r => ({number: r.number, child_id: r.child_id, state: r.state,
         provider: r.provider ?? record.provider, model: r.model ?? record.model, effort: r.effort ?? record.effort,
         route_recorded_per_round: r.model !== undefined})),
+      // The original request is returned with the result so a saved assignment can be
+      // audited for what was asked, not only for what came back.
+      prompt: record.prompt, allowed_tools: [...(record.allowed_tools ?? [])],
       text: record.visibleText.slice(offset, offset + 12000), total_chars: record.visibleText.length,
       next_offset: Math.min(record.visibleText.length, offset + 12000), cost_unknown: true, soft_target_usd: 1,
       approval_required: false, automatic_retry: false, continuation_safe: record.continuation_safe, continuation_uses_new_child: true};
@@ -95,5 +98,26 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
     need(record.owner === owner && record.run_id === runId && Array.isArray(record.rounds) && typeof record.visibleText === 'string', 'CORRUPT_ASSIGNMENT');
     return {...page(record, offset), recovered: true, replay_enabled: false};
   }
-  return {delegate, read, dispose() {disposed = true; for (const c of controllers) c.abort(new DOMException('Bridge disposed', 'AbortError'));}};
+  /** Summaries only: enough to find a run again without replaying its saved output. */
+  async function list() {
+    const records = await store.entries();
+    return records.map(entry => entry.data)
+      .filter(record => record && record.owner === owner && typeof record.run_id === 'string')
+      .map(record => ({run_id: record.run_id, state: record.state, provider: record.provider, model: record.model,
+        effort: record.effort, rounds: Array.isArray(record.rounds) ? record.rounds.length : 0,
+        total_chars: typeof record.visibleText === 'string' ? record.visibleText.length : 0,
+        allowed_tools: [...(record.allowed_tools ?? [])], created_at: record.createdAt ?? null}))
+      .sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
+  }
+  /** Delete one saved assignment. A run in flight is refused rather than deleted beneath
+   * itself, so a forget cannot strand a dispatcher mid-write. */
+  async function forget(runId) {
+    const key = id(runId);
+    need(!busy.has(key), 'DELEGATION_BUSY');
+    const saved = await store.read(key); need(saved, 'UNKNOWN_ASSIGNMENT');
+    need(saved.data?.owner === owner, 'OWNER_REFUSED');
+    await store.remove(key);
+    return {run_id: runId, removed: true};
+  }
+  return {delegate, read, list, forget, dispose() {disposed = true; for (const c of controllers) c.abort(new DOMException('Bridge disposed', 'AbortError'));}};
 }
