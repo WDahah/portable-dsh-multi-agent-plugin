@@ -4,6 +4,19 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.2.1
+
+### Fixed
+
+- A deadline test failed intermittently on slow CI runners — observed once on
+  Windows/Node 22 while the same commit passed on every other platform and on a rerun.
+  The task deadline starts at plan time by design, but the fixture also depended on real
+  elapsed time, so the journal write in `plan()` could consume the whole 100 ms budget
+  before `run()` began; the engine then correctly declined to dispatch and returned
+  `PARTIAL_LIMIT` where the test expected `INTERRUPTED_UNCERTAIN`. The fixture now freezes
+  its clock, so only the in-flight abort under test decides the outcome. No source
+  behavior changed, and the test still fails when the deadline abort is removed.
+
 ## 1.2.0
 
 ### Added
