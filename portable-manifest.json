@@ -23,7 +23,7 @@
     },
     {
       "path": "INSTALL-WITH-AI.md",
-      "sha256": "538c0e2a0dee9105ca7577adba731fd4461444f792ef6f3e402515e12fb4dbb0"
+      "sha256": "9924dcbaa66247e1ae827954dac4d1d4de386b8bb0d3832504f4a2c4d525c3b1"
     },
     {
       "path": "LICENSE",
@@ -31,7 +31,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "df9612a20b5a7ffec72668064235a3e5bb93a3a746b7f2a40c33b6bc1b639ea2"
+      "sha256": "83a573ea2a8cc8e508544b47ca0d1695e942a45f83f87931b10dc1473ae0f4c2"
     },
     {
       "path": "SECURITY.md",
@@ -39,7 +39,7 @@
     },
     {
       "path": "START-HERE.md",
-      "sha256": "97e42ee54754c0423008cabe911e93d0fc5173cfd7df5260e88b3ae1ca4d4b1f"
+      "sha256": "d891cecb533b92db2b65a2f514321a72360bf1167bd5d9a653212bcf96ad1de8"
     },
     {
       "path": "VALIDATION.md",
