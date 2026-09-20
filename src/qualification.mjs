@@ -136,7 +136,7 @@ export function createQualificationManager({root, owner, getLlm, getSubagents, g
         }
       }
       run = await subagents.start('spawn', {parent: exec.agent, signal: scope.signal,
-        label: `Route qualification (${capability})`, agentOptions: config, maxDepth: 1,
+        label: `Qualify ${capability} · ${route.provider}/${route.model} · ${effort}`, agentOptions: config, maxDepth: 1,
         toolFilter: {allow: []},
         persona: 'Answer only the bounded capability probe. Do not delegate or use tools.',
         prompt});
@@ -167,7 +167,8 @@ export function createQualificationManager({root, owner, getLlm, getSubagents, g
       need(prepared.config.provider === config.provider && prepared.config.model === config.model && prepared.config.reasoningEffort === effort && prepared.config.maxTokens === maxTokens, 'QUALIFICATION_CONFIG_MISMATCH');
       token = randomUUID(); const marker = randomUUID();
       const challenge = {marker, calls: [], expiresAt: issuedAt + deadlineMs}; challenges.set(token, challenge);
-      run = await subagents.start('spawn', {parent: exec.agent, signal: scope.signal, label: 'Route qualification',
+      run = await subagents.start('spawn', {parent: exec.agent, signal: scope.signal,
+        label: `Qualify smoke · ${route.provider}/${route.model} · ${effort}`,
         agentOptions: config, maxDepth: 1, toolFilter: {allow: ['orchestrator_qualification_echo']},
         persona: 'Perform only the bounded qualification. Do not delegate or access other tools.',
         prompt: [{type: 'text', text: `Call orchestrator_qualification_echo exactly once with token ${token}. Compute 19 + 23. Then return exactly QUALIFIED:<marker returned by the tool>:42 and no other text.`}]});

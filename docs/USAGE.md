@@ -47,6 +47,12 @@ Call `orchestrator_plan` with `task`, unique `task_id`, `prompt`, and optionally
 - Clean `max-tokens` plus valid settlement and new visible progress may continue. Empty/repeated output or technical limits stop further rounds. Read-only native continuation starts a **new child**, not a promise of same-child memory.
 - Writes/edits/commands disable automatic native continuation because side effects may already have happened. Cancellation, transport loss and uncertain usage are not automatically retried. `orchestrator_resume` cannot override an unsafe state.
 
+## Knowing which model produced which output
+
+Every result attributes its work to an exact route. A delegated assignment reports `provider`, `model`, and `effort` on the assignment **and on each round**, beside that round's `child_id`; `orchestrator_read` reports the task `route` plus the same three fields per round. Child agents are labelled `role · provider/model · effort · round N` — for example `R04 · codex/gpt-5.6-terra · medium · round 1` — so two children differing only by model are distinguishable in a session tree.
+
+Each round also carries `route_recorded_per_round` (`routeRecordedPerRound` for direct tasks). When it is `false`, that round predates per-round routes and the reported model comes from the task's route rather than from a value stored with the round. A stored round route must match the route its task planned, so an edited journal cannot attribute a round to a model that never ran it.
+
 ## Reading outcomes honestly
 
 Inspect terminal status, selected route/effort, round count, saved text and accounting. A successful stop is not semantic acceptance of code. Run project-specific tests under the project's permissions. Raw continuation aggregation may join adjacent lines/words; preserve round boundaries when checking exact output.

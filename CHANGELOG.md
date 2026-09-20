@@ -4,6 +4,36 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.2.0
+
+### Added
+
+- **Results now say which model produced them.** Child agents are labelled
+  `role · provider/model · effort · round N`, so two children differing only by model are
+  distinguishable in a session tree; previously every child read as
+  `Orchestrated <role> round N`. Qualification children name their route the same way.
+- Each delegated round records and reports its own `provider`, `model`, and `effort`
+  beside its `child_id`, and direct-task rounds do the same. The round is the unit of
+  execution, so attribution belongs with it rather than only on the enclosing record.
+- `orchestrator_read` reports the task `route`. It previously returned no provider,
+  model, or effort at all, although the documentation told readers to inspect the
+  selected route and the journal had stored it since 1.0.0.
+
+### Changed
+
+- Direct-task journal rounds may carry an optional `route`. Records written by earlier
+  versions remain readable: a round without one reports the task's route and sets
+  `routeRecordedPerRound: false` rather than claiming attribution it does not have. A
+  stored round route must match the route its task planned, so an edited journal cannot
+  attribute a round to a model that never ran it, and unknown round keys are still
+  refused.
+
+### Upgrading
+
+Reading is one-way. This version reads journals written by 1.0.x and 1.1.x, but **older
+versions reject journals written by this one** as corrupt, because their round schema
+admits no `route` field. Finish or abandon in-flight direct tasks before downgrading.
+
 ## 1.1.1
 
 ### Fixed
