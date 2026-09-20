@@ -11,6 +11,8 @@ Any capable AI assistant can follow the installation guide. That does **not** me
 - [docs/USAGE.md](docs/USAGE.md): tool calls and task metadata.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): host integration and persistence.
 - [docs/SECURITY-AND-LIMITS.md](docs/SECURITY-AND-LIMITS.md): read before enabling paid calls or project writes.
+- [SECURITY.md](SECURITY.md): report security vulnerabilities privately.
+- [CONTRIBUTING.md](CONTRIBUTING.md): development checks and pull request guidance.
 - [examples/PROJECT-PROMPT.md](examples/PROJECT-PROMPT.md): scoped task prompt for any project.
 - [examples/task.json](examples/task.json): task metadata, not a complete delegation request.
 
