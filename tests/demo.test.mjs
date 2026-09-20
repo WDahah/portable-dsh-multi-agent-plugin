@@ -70,6 +70,20 @@ test('a named scene runs alone and an unknown one fails loudly', async () => {
     return true;
   });
 });
+test('the quickstart commands parse in every common shell', async () => {
+  // `&&` is a parse error in Windows PowerShell, still the default shell on Windows, and
+  // the quickstart is the first command a stranger runs. A shipped one-liner failed there
+  // because it had only ever been tried in pwsh 7, so the shell-agnostic form is enforced.
+  const fs = await import('node:fs/promises');
+  const root = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
+  for (const file of ['README.md', path.join('docs', 'DESIGN-NOTES.md')]) {
+    const text = await fs.readFile(path.join(root, file), 'utf8');
+    for (const block of text.matchAll(/```(?:sh|bash|console|shell)\n([\s\S]*?)```/g)) {
+      assert.equal(block[1].includes('&&'), false,
+        `${file} has a shell block using && — it will not parse in Windows PowerShell`);
+    }
+  }
+});
 test('output is clean when piped, so it can be pasted or logged', async () => {
   // execFile gives a non-TTY stdout, which is the condition colour must switch off under.
   const output = (await run(process.execPath, [demo], {env: {...process.env, NO_COLOR: ''}})).stdout;

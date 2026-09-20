@@ -31,7 +31,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "9fca8967956ca0275a8489e71a69eb912dab5c5807e8d240c50ff91cbb4bd189"
+      "sha256": "c65bf1d448fd19f65592611ce3e3806a9ccbbe656c15c9b13ab931bf5e540e85"
     },
     {
       "path": "CODE_OF_CONDUCT.md",
@@ -51,7 +51,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "875bbac7b2ef60e1122f49c649086b935fa1f14e30b112a3121fc4b34d2604a5"
+      "sha256": "06249e5d052795be9f528a9b088a985935ea416b25192bb17f68eeec625af51e"
     },
     {
       "path": "SECURITY.md",
@@ -75,7 +75,7 @@
     },
     {
       "path": "docs/DESIGN-NOTES.md",
-      "sha256": "bc9cdfaab12269bd5bcc5e424564084ec218f09a2c503732584c143a6d634acf"
+      "sha256": "606e119a8d21034a55e6153195ea75ee07448ae157229b1c80ee19a58351f037"
     },
     {
       "path": "docs/SECURITY-AND-LIMITS.md",
@@ -99,7 +99,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "ea367b874c5d008badef1b1b1c1425a0f43f12f51bcdaec0088205ba50369a3c"
+      "sha256": "f5b6032ca2816c7b3cd1cc6ae3c73423dd052587da17b1dab374f3bfaa5a610d"
     },
     {
       "path": "scripts/doctor.mjs",
@@ -167,7 +167,7 @@
     },
     {
       "path": "tests/demo.test.mjs",
-      "sha256": "81ea2f1df229b25e2b21ede560c3bfafa784e7b7a5c9eccfc61f0ebf00532768"
+      "sha256": "d2ec7adf3a08bb8dfb27c9f15398dd30ac4f7e9a9dc0111154c43c5677159c4a"
     },
     {
       "path": "tests/diagnostic.test.mjs",
