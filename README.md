@@ -38,6 +38,8 @@ node scripts/doctor.mjs
 
 The verifier checks listed file hashes in `portable-manifest.json` and detects missing/modified listed files. It is not an authenticity signature and does not reject unlisted extra files. Use a complete, finalized distribution with its manifest; do not fabricate a new manifest to conceal a failed check.
 
+Whether you clone or copy the folder, the files must keep their committed bytes. `.gitattributes` disables line-ending translation for exactly this reason. If verification reports many or all files as modified, the checkout rewrote line endings rather than the code being tampered with — refresh it with `git rm -r --cached . && git reset --hard` (or re-clone) instead of regenerating the manifest.
+
 `--state-root` is optional; use it explicitly when isolating this installation. Supply exactly one of `--tools-module` or the alternative `--harness-root "<absolute installed host directory>"` discovery option, not both. The portable code uses Node built-ins; **`npm install` is not required for this package**. That does not remove the separate DSH host requirement.
 
 Setup generates only **`.local/entry.mjs` and `.local/host-patch.yml`**. It does not edit or activate a host profile. Doctor checks the local/generated integration offline; it can also accept the tools-module argument. Neither doctor nor `npm test` authenticates a provider, makes live qualification claims, or proves that the running host loaded the plugin.

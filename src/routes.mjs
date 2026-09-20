@@ -29,7 +29,7 @@ export const ROUTES = freeze([
   route('deepseek-v41-flash', 'deepseek-v41-label', 'deepseek-official', 'deepseek-flash', ['balanced'], 'Display label V4.1 Flash; runtime model string only, not immutable backend identity.'),
   route('deepseek-v4-flash', 'deepseek-v4-flash', 'deepseek-official', 'deepseek-v4-flash', ['economy'], 'Exact legacy model string; backend version not inferred.'),
   route('deepseek-v4-pro', 'deepseek-v4-pro', 'deepseek-official', 'deepseek-v4-pro', [], 'Declared inventory reserve; no automatic pool assignment.'),
-  route('deepseek-v4-vision', null, 'deepseek-official', 'deepseek-v4-flash-vision-exp', [], 'Actual V4 vision route is NOT the unresolved historical V4.1 vision label.', true),
+  route('deepseek-v4-vision', null, 'deepseek-official', 'deepseek-v4-flash-vision-exp', ['vision'], 'Actual V4 vision route is NOT the unresolved historical V4.1 vision label; reachable only through an explicit vision pool and a passed image probe.', true),
   route('kimi-k3', 'kimi-k3', 'kimi-coding', 'k3', ['advanced', 'long-horizon'], 'Open Platform kimi-k3 candidate to Kimi Coding subscription k3.'),
   route('kimi-k3-256k', 'kimi-k3-256-label', 'kimi-coding', 'k3-256k', [], 'Explicit nearby spelling resolution for this overlay only; reserve route.'),
   route('kimi-coding', 'kimi-k27', 'kimi-coding', 'kimi-for-coding', [], 'Explicit surface/model replacement, NOT identity equivalence to historical K2.7; reserve route.'),
@@ -42,16 +42,22 @@ export const POOL_PRIORITY = freeze({
   economy: ['codex-luna', 'deepseek-v4-flash'],
   balanced: ['codex-terra', 'claude-sonnet', 'deepseek-v41-flash'],
   advanced: ['codex-sol', 'claude-opus', 'kimi-k3'],
-  'long-horizon': ['claude-fable', 'codex-astra', 'kimi-k3']
+  'long-horizon': ['claude-fable', 'codex-astra', 'kimi-k3'],
+  // Explicit-only: image work still routes through ordinary pools when those routes pass
+  // an image probe. This pool exists for deliberately choosing the dedicated vision model.
+  vision: ['deepseek-v4-vision']
 });
 const advancedRoles = new Set(['R03', 'R07', 'R08', 'R09', 'R12']);
 const domainRoles = new Set(['R08', 'R09']);
 const allowedCapabilities = new Set(['text', 'tools', 'image', 'structured-output', 'video']);
-const nonempty = value => typeof value === 'string' && value.length > 0 && value.length <= 256;
+const nonempty = (value, max = 256) => typeof value === 'string' && value.length > 0 && value.length <= max;
+// Ordinary smoke evidence admits only these; wider classes require an attestation.
+export const BASE_DATA_CLASSES = Object.freeze(['public', 'internal']);
 const integer = value => Number.isSafeInteger(value) && value >= 0;
 export function expectedEffort(routeOrId, pool) {
   const entry = typeof routeOrId === 'string' ? ROUTES.find(r => r.id === routeOrId) : routeOrId;
   if (!entry || !Object.hasOwn(POOL_PRIORITY, pool)) throw new TypeError('Unknown route or pool');
+  // vision and the remaining pools use the standard tier; only advanced/long escalate.
   return entry.effortsExpected[pool === 'long-horizon' ? 'long' : pool === 'advanced' ? 'deep' : 'standard'];
 }
 function taskPolicy(task) {
@@ -71,6 +77,11 @@ function recordReason(q, route, effort, task, now) {
       !integer(q.issuedAt) || !integer(q.expiresAt) || !integer(q.durationMs) || q.expiresAt <= q.issuedAt ||
       !Array.isArray(q.caseResults) || !Array.isArray(q.allowedDataClasses) || typeof q.domainEvidence !== 'boolean' ||
       ['available', 'transportPassed', 'textPassed', 'toolPassed', 'imagePassed'].some(k => typeof q[k] !== 'boolean')) return 'INVALID_QUALIFICATION';
+  // Policy wider than ordinary smoke is only usable with the attestation that authorized
+  // it, so a record claiming more without a named author and basis fails closed.
+  const widened = q.domainEvidence || q.allowedDataClasses.some(c => !BASE_DATA_CLASSES.includes(c));
+  if (widened && (q.attestation?.kind !== 'operator-attestation' ||
+      !nonempty(q.attestation.attestedBy) || !nonempty(q.attestation.basis, 2000))) return 'UNATTESTED_POLICY_WIDENING';
   if (q.provider !== route.provider || q.model !== route.model || q.effort !== effort) return 'EXACT_ROUTE_EFFORT_MISMATCH';
   if (q.issuedAt > now) return 'FUTURE_QUALIFICATION';
   if (q.expiresAt <= now) return 'EXPIRED_QUALIFICATION';

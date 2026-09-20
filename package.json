@@ -1,14 +1,28 @@
 {
   "name": "portable-dsh-multi-agent",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "private": true,
   "type": "module",
+  "description": "Portable DeepSeek Harness/Cordis native plugin for task-routed model selection, scoped child-agent delegation, and durable bounded continuation.",
+  "license": "MIT",
+  "author": "WDahah",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/WDahah/portable-dsh-multi-agent-plugin.git"
+  },
+  "bugs": {
+    "url": "https://github.com/WDahah/portable-dsh-multi-agent-plugin/issues"
+  },
+  "homepage": "https://github.com/WDahah/portable-dsh-multi-agent-plugin#readme",
   "engines": {
     "node": ">=22"
   },
   "scripts": {
     "test": "node --test",
     "setup": "node scripts/setup.mjs",
-    "doctor": "node scripts/doctor.mjs"
+    "doctor": "node scripts/doctor.mjs",
+    "verify": "node scripts/verify.mjs",
+    "manifest": "node scripts/manifest.mjs",
+    "manifest:check": "node scripts/manifest.mjs --check"
   }
 }

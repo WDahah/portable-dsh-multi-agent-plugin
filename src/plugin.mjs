@@ -5,6 +5,18 @@ import {createTaskEngine} from './engine.mjs';
 import {createQualificationManager, need, BUILD_ID} from './qualification.mjs';
 import {createAgentDispatcher} from './agent-dispatch.mjs';
 
+// Refusals the caller can act on. Anything outside this closed list reads as UNAVAILABLE,
+// so an unexpected failure can never leak a provider message, path or credential.
+const REFUSAL_REASONS = new Set(['DISABLED', 'OWNER_REQUIRED', 'OWNER_CAPACITY', 'OWNER_REFUSED', 'DISPOSED',
+  'UNKNOWN_ROUTE', 'EFFORT_NOT_IN_ROUTE_POLICY', 'UNKNOWN_CAPABILITY_PROBE', 'INVALID_ATTESTATION',
+  'INVALID_ATTESTED_DATA_CLASS', 'ATTESTATION_AUTHOR_AND_BASIS_REQUIRED', 'IMAGE_ATTACHMENTS_UNAVAILABLE',
+  'QUALIFICATION_BUSY', 'DELEGATION_BUSY', 'CONCURRENT_TASK', 'TASK_CAPACITY', 'TASK_EXISTS',
+  'ASSIGNMENT_ALREADY_EXISTS', 'UNKNOWN_ASSIGNMENT', 'UNKNOWN_TASK', 'INVALID_RUN_ID', 'INVALID_TASK_ID',
+  'INVALID_PROMPT', 'INVALID_TOOL_FILTER', 'INVALID_TECHNICAL_LIMIT', 'INVALID_MAX_TOKENS', 'INVALID_OFFSET',
+  'INVALID_PAGE', 'INVALID_ROUTE', 'MISSING_SERVICE', 'SUBAGENTS_UNAVAILABLE', 'LLM_UNAVAILABLE',
+  'PERSISTENCE_FAILED', 'INVALID_CHALLENGE', 'CHALLENGE_ALREADY_USED']);
+const refusalReason = error => typeof error?.code === 'string' && REFUSAL_REASONS.has(error.code) ? error.code : 'UNAVAILABLE';
+
 /** Inject the installed host's native defineTool; this package does not vendor DSH. */
 export function createPlugin(defineTool) {
   if (typeof defineTool !== 'function') throw new TypeError('Native defineTool function required');
@@ -19,7 +31,8 @@ export function createPlugin(defineTool) {
       need(!disposed && typeof exec.agent?.id === 'string' && exec.agent.id, 'OWNER_REQUIRED'); exec.signal.throwIfAborted();
       if (!owners.has(exec.agent.id)) {
         need(owners.size < 64, 'OWNER_CAPACITY');
-        const options = {root: config.stateRoot, owner: exec.agent.id, getLlm: () => ctx.get('llm'), getSubagents: () => ctx.get('subagents')};
+        const options = {root: config.stateRoot, owner: exec.agent.id, getLlm: () => ctx.get('llm'),
+          getSubagents: () => ctx.get('subagents'), getAttachments: () => ctx.get('attachments')};
         owners.set(exec.agent.id, {qualifications: createQualificationManager(options), agents: createAgentDispatcher(options), engine: createTaskEngine(options)});
       }
       return owners.get(exec.agent.id);
@@ -27,7 +40,9 @@ export function createPlugin(defineTool) {
     const schema = {type: 'object', additionalProperties: true};
     function register(name, description, parameters, fn, timeoutMs = 60000) {
       registerLifetimeTool(ctx, defineTool({name, description, parameters, timeoutMs, output: {schema, render(_a, value) {return [{type: 'text', text: JSON.stringify(value)}];}},
-        async execute(args, exec) {try {return await fn(args, exec);} catch {return {status: 'BRIDGE_REFUSED_OR_FAILED', details_redacted: true, automatic_retry: false};}}}));
+        async execute(args, exec) {try {return await fn(args, exec);} catch (error) {
+          return {status: 'BRIDGE_REFUSED_OR_FAILED', reason: refusalReason(error), details_redacted: true, automatic_retry: false};
+        }}}));
     }
     register('orchestrator_qualification_echo', 'Bounded readonly qualification challenge; no filesystem, network or delegation.', {token: {type: 'string', required: true}}, (args, exec) => {
       need(!disposed, 'DISPOSED');
@@ -40,11 +55,12 @@ export function createPlugin(defineTool) {
       return {enabled, build_id: BUILD_ID, approval_required: false, soft_target_usd: 1, hard_budget_cap: false,
         routes: ROUTES.map(route => ({id: route.id, provider: route.provider, model: route.model, pools: [...route.pools], efforts: {...route.effortsExpected}, provider_registered: providers.includes(route.provider)})), qualifications: records};
     });
-    register('orchestrator_qualify', 'Run one bounded real native-agent text/tool smoke probe and record actual evidence. Costs may be unknown; no approval or financial ceiling.',
-      {route_id: {type: 'string', required: true}, effort: {type: 'string', required: true}}, async (args, exec) => {
+    register('orchestrator_qualify', 'Run one bounded real native-agent smoke probe for an exact route and effort, optionally adding image or structured-output capability probes and an operator attestation. Costs may be unknown; no approval or financial ceiling.',
+      {route_id: {type: 'string', required: true}, effort: {type: 'string', required: true},
+        capabilities: {type: 'array', items: {type: 'string'}}, attestation: {type: 'json'}}, async (args, exec) => {
         need(enabled, 'DISABLED'); const entry = owned(exec), route = ROUTES.find(route => route.id === args.route_id); need(route, 'UNKNOWN_ROUTE');
         need(Object.values(route.effortsExpected).includes(args.effort), 'EFFORT_NOT_IN_ROUTE_POLICY');
-        return entry.qualifications.qualify(route, args.effort, exec);
+        return entry.qualifications.qualify(route, args.effort, exec, {capabilities: args.capabilities, attestation: args.attestation});
       }, 190000);
     async function choose(args, exec) {
       const entry = owned(exec), selected = selectRoute({task: args.task, qualifications: await entry.qualifications.list()});

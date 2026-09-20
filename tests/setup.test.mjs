@@ -8,10 +8,11 @@ import {prepareSetup, resolveToolsModule, parseArgs, assertNode} from '../script
 import {doctor} from '../scripts/doctor.mjs';
 import {verify} from '../scripts/verify.mjs';
 import {createHash} from 'node:crypto';
+import {makeTempRoot} from './helpers/tmp.mjs';
 
 // Explicit synthetic host/factory fixtures: no real host application or provider calls.
 async function fixture(t) {
-  const temporary = await fs.mkdtemp(path.join(os.tmpdir(), 'portable-agent-setup-'));
+  const temporary = await makeTempRoot('portable-agent-setup-');
   t.after(() => fs.rm(temporary, {recursive: true, force: true})); // Only this test-created temporary tree.
   const bundle = path.join(temporary, "bundle spaces ü ' quote"), host = path.join(temporary, 'synthetic host');
   await fs.mkdir(path.join(bundle, 'src'), {recursive: true}); await fs.mkdir(host);

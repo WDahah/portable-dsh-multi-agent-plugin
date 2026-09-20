@@ -23,11 +23,21 @@ Live evidence is exact to provider/model/effort and **owner/root agent session**
 
 A failed probe stays unavailable; do not forge qualification JSON, promote synthetic fixtures, silently alias another model, or uninstall a provider to hide a failure. Automatic requalification is not claimed. Basic smoke verifies limited text/tool behavior, not broad competence, confidentiality or an immutable backend identity.
 
-`R05` needs image evidence; `R08`/`R09` need domain evidence beyond the smoke. They remain unavailable with basic qualification alone. Public/internal data classes are operational routing policy, not privacy certification. Confidential/restricted data requires additional appropriate controls and evidence.
+`R05` needs a passed image probe; `R08`/`R09` need domain evidence; confidential/restricted data needs an operator attestation. Each is requested through `orchestrator_qualify` (see [USAGE.md](USAGE.md)), and none is granted by basic smoke alone.
+
+An attestation records a named human claim and its written basis, and widens routing policy only. It is **not** a capability proof, an entitlement check, a compliance control, or a privacy certification, and this plugin cannot verify that its author was authorized to make it. A stored record whose policy exceeds ordinary smoke without an attestation is refused as tampered. Confidential and restricted data still require whatever controls your environment actually demands; recording an attestation does not create them.
+
+Capability probes consume real quota like any other probe. An image probe writes its generated PNGs through the host attachment service, so those bytes follow that service's ordinary retention.
 
 ## Persistence and recovery
 
 Original prompts and visible outputs are **plaintext** in the state directory. Restrict filesystem access, minimize sensitive content and choose a fresh absolute private directory. Do not copy task/qualification state to manufacture readiness elsewhere. Checksums detect corruption, not a malicious writer who controls the directory.
+
+State directories and files are created with POSIX modes `0700`/`0600`. **Windows ignores those modes**, so the state directory inherits the parent folder's ACL instead. On Windows, place it outside shared or synchronized locations and restrict it explicitly, for example:
+
+```powershell
+icacls "<state directory>" /inheritance:r /grant:r "$env:USERNAME:(OI)(CI)F"
+```
 
 The implementation assumes one trusted coordinator. Exclusive revisions and file synchronization do not provide distributed transactions, guaranteed remote exactly-once delivery, or power-loss durability. An abrupt interruption can lose an uncheckpointed text tail. Redacted diagnostics are in memory only; unavailable diagnostics are not proof of a provider cause.
 
@@ -40,6 +50,8 @@ Uncertain transport/usage states, cancelled requests and recovered in-flight att
 Historical API rate estimates are not current invoices. Subscription/native-agent costs may be unknown; zero known-cost subtotal with `costUnknown:true` does not mean free execution. Reasoning counts must not be charged twice. Provider middleware may perform authentication refresh or internal retries, so one engine attempt is not universally one HTTP request.
 
 Direct tasks have a 15-minute wall-clock deadline beginning at **plan time**, default3/max8 rounds, bounded context/output and requested output-token limits. Native tasks also have bounded rounds/time/context. Adapter behavior can differ; do not equate a requested token limit with proven upstream enforcement. Cancellation is cooperative and cannot prove billing stopped.
+
+Concurrency is deliberately small. Per owner session, **at most 2 qualifications and 2 delegations run at once** (`QUALIFICATION_BUSY`, `DELEGATION_BUSY`), one run per task ID (`CONCURRENT_TASK`), and at most 64 owner sessions and 64 loaded tasks (`OWNER_CAPACITY`, `TASK_CAPACITY`). These are refusals, not queues: a third concurrent delegation is rejected rather than delayed, and the caller decides whether to retry.
 
 ## Output acceptance
 

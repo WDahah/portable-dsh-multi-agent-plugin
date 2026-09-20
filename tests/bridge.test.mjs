@@ -8,8 +8,9 @@ import {createPlugin} from '../src/plugin.mjs';
 import {createRecordStore, createQualificationManager, keyOf} from '../src/qualification.mjs';
 import {createAgentDispatcher} from '../src/agent-dispatch.mjs';
 import {ROUTES, selectRoute} from '../src/routes.mjs';
+import {makeTempRoot} from './helpers/tmp.mjs';
 
-const root = await fs.mkdtemp(path.join(os.tmpdir(), 'portable-bridge-test-'));
+const root = await makeTempRoot('portable-bridge-test-');
 // Delete only the unique directory created by this test file.
 after(() => fs.rm(root, {recursive: true, force: true}));
 let sequence = 0;
