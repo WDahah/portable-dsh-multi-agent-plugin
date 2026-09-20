@@ -15,7 +15,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "186f5b9c020b4b5cae051551ada6433df424bc5f308eaa68a966e7aca54f9e6d"
+      "sha256": "9fca8967956ca0275a8489e71a69eb912dab5c5807e8d240c50ff91cbb4bd189"
     },
     {
       "path": "CONTRIBUTING.md",
@@ -55,7 +55,7 @@
     },
     {
       "path": "docs/USAGE.md",
-      "sha256": "e79ccdabd90d810831dedf4478fd62ffb3b6f4d8d977216f3fb1b2586879f9a5"
+      "sha256": "4af196ecd5d9d512bb36d7b6210678e4eab7732264d648ad565475245dbeae32"
     },
     {
       "path": "examples/PROJECT-PROMPT.md",
@@ -71,7 +71,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "9720f32bcf6a92686d7b7b53244f7dc83b1c505927aa6e72dee0557226eaf1d9"
+      "sha256": "089c995cfcdffba37af267a914cb214b748f558dfa7be666d3879f60eeb7cb84"
     },
     {
       "path": "scripts/doctor.mjs",
@@ -91,7 +91,7 @@
     },
     {
       "path": "src/agent-dispatch.mjs",
-      "sha256": "555f4b1157213187e0c7c83452313dd4af2b6dbbe41745058c7b4f5c9a736694"
+      "sha256": "9145ae6b66b6e006e018db83d83585b34e3ee9b560ee1559eaacafae8bab89a0"
     },
     {
       "path": "src/cancellation.mjs",
@@ -107,7 +107,7 @@
     },
     {
       "path": "src/plugin.mjs",
-      "sha256": "08ce8aa18cbd5540079968090a385d127b1df1d5ff59cf1f3b8fcf26e8ec2e56"
+      "sha256": "19fbfa68e15aa12b6a353814c6932de8a4cd4da523144ded0344cd9724bb34c3"
     },
     {
       "path": "src/probes.mjs",
@@ -154,6 +154,10 @@
       "sha256": "1ce09c17887411ded987f92bdbd93b0a080edcccad58b2510345abcaecbb8352"
     },
     {
+      "path": "tests/integrity.test.mjs",
+      "sha256": "79559f082a34794e757a68e0792587805c1ed30438fb57466afd66905405417f"
+    },
+    {
       "path": "tests/loop.test.mjs",
       "sha256": "3e59d56d38b2ca952d887ad94e5e7e3da307cec18a3a4f0a49ed213e2dbe7a4d"
     },
@@ -183,7 +187,7 @@
     },
     {
       "path": "tests/state-management.test.mjs",
-      "sha256": "705569f88a0e78dbbc8e181f1a60c1ab64af6ecd7608ccb90319a01c25385b3f"
+      "sha256": "e1d192b7732ff055dceceb05da3459f77ea5b1f58c26137cd2dc7362fad24934"
     }
   ]
 }

@@ -81,7 +81,19 @@ Each cycle reviews with a different provider where one is qualified, then revise
 | `VERDICT_UNREADABLE` | No usable verdict, so no state was inferred |
 | `REVISION_INCOMPLETE` | A revision did not finish cleanly and was not handed on |
 
+On `VERDICT_UNREADABLE` the cycle also reports `reviewState` and an `unreadableCause`, because a reviewer cut off by a token limit and one that answered in prose need opposite responses:
+
+| Cause | What to do |
+|---|---|
+| `REVIEWER_HIT_TOKEN_LIMIT` | Raise `max_tokens` — a reasoning model spends tokens before it answers |
+| `REVIEWER_RETURNED_NO_USABLE_VERDICT` | Reword the request; the budget was sufficient |
+| `REVIEWER_DID_NOT_COMPLETE` | The run was interrupted; nothing was judged |
+
+Give a reviewer room to think. A 2,048-token ceiling truncated a real reviewer before it emitted anything; the default of 16,384 was sufficient.
+
 The cap is **3**, separate from and lower than the 8-round assignment limit, because each cycle is a full model call. Revise cycles **may write files** when you allow those tools; each records its own evidence link, so an unreviewed write is always identifiable.
+
+A reviewer that answers only through the structured channel still leaves a readable answer: the verdict is rendered as its saved text, so the record reads back and can itself be reviewed. The parsed verdict stays the authority.
 
 The `objective` travels to every child as fenced data, and the reviewer reports drift as `onObjective: false`. Drift is declared by the reviewer, never inferred by comparing text.
 
@@ -114,6 +126,8 @@ A direct task's readable id is kept in a small side index beside the journal, be
 ```
 
 `qualifications` accepts `expired` (prune only lapsed evidence) or `all`. Deletion is permanent and is refused while that exact run or task is in flight, so a forget cannot strand work mid-write. A forgotten id becomes available again — deletion leaves no tombstone.
+
+Deleting a run that a later review points at is also refused, with `ASSIGNMENT_REFERENCED_BY_REVIEW` and the `referenced_by` list naming what blocks it. Cascading would destroy the review and clearing its link would erase what it judged, so neither happens. Delete those reviews first, or pass `force: true` to accept a dangling reference deliberately.
 
 `orchestrator_read` and `orchestrator_delegate_read` also return the original `prompt`, so a saved record shows what was asked, not only what came back.
 
