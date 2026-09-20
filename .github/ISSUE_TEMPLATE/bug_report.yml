@@ -1,0 +1,44 @@
+name: Bug report
+description: Something behaved differently from what the docs say
+labels: [bug]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Refusals are often deliberate. `MISSING_EXACT_QUALIFICATION`, `UNCONVERGED` and
+        `VERDICT_UNREADABLE` are designed outcomes, not failures — but if one fired when
+        it should not have, that is exactly the bug worth reporting.
+  - type: textarea
+    id: expected
+    attributes:
+      label: What you expected, and what happened instead
+    validations:
+      required: true
+  - type: textarea
+    id: reproduce
+    attributes:
+      label: How to reproduce
+      description: The tool call and arguments, with any secrets removed.
+      render: json
+    validations:
+      required: true
+  - type: input
+    id: version
+    attributes:
+      label: Plugin version
+      description: From package.json, or the tag you installed.
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node.js version and OS
+      placeholder: node 22.x, Windows 11
+    validations:
+      required: true
+  - type: textarea
+    id: output
+    attributes:
+      label: Relevant output
+      description: Prompts and outputs are stored in plaintext — redact anything private.
+      render: shell

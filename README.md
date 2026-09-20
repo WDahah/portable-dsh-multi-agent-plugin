@@ -1,8 +1,27 @@
 # Multi-agent: portable DSH/Cordis orchestration plugin
 
+[![CI](https://github.com/WDahah/portable-dsh-multi-agent-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/WDahah/portable-dsh-multi-agent-plugin/actions/workflows/ci.yml)
+[![Release](https://img.shields.io/github/v/release/WDahah/portable-dsh-multi-agent-plugin)](https://github.com/WDahah/portable-dsh-multi-agent-plugin/releases)
+[![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
+[![Node.js](https://img.shields.io/badge/node-%E2%89%A522-brightgreen)](package.json)
+[![Dependencies](https://img.shields.io/badge/dependencies-none-brightgreen)](package.json)
+
 **One model writes the work. A different one reviews it. Neither of them decides whether it passed.**
 
 This is a native plugin for a compatible DeepSeek Harness (DSH)/Cordis host — not a standalone agent framework. It routes each task to a model that has actually been tested for it, runs the work in a scoped child agent, and keeps a durable record of what was asked, which model answered, and what authorized the run.
+
+## Try the routing logic without installing anything
+
+The parts that decide *which model runs what, and whether a result can be trusted* have no host calls and no dependencies. You can watch them work in about ten seconds:
+
+```bash
+git clone https://github.com/WDahah/portable-dsh-multi-agent-plugin
+cd portable-dsh-multi-agent-plugin && node demo.mjs
+```
+
+It runs the **same** `selectRoute` and `parseVerdict` the plugin uses in production — only the qualification evidence is synthetic — and shows real refusals, provider-diversity selection, and why prose is never accepted as a verdict. Pass a scene name (`routing`, `refusal`, `expiry`, `diversity`, `verdicts`, `objective`, `aliases`) to run one alone.
+
+If you want the reasoning rather than the code, [docs/DESIGN-NOTES.md](docs/DESIGN-NOTES.md) explains the decisions and what they cost — including a token estimate we got wrong, and why.
 
 ## What it looks like
 
@@ -153,6 +172,8 @@ Being clear about this matters more than the feature list, because every claim a
 
 ## Start here
 
+- [demo.mjs](demo.mjs): run the routing and verdict logic with no host — `node demo.mjs`.
+- [docs/DESIGN-NOTES.md](docs/DESIGN-NOTES.md): the decisions and what they cost, readable without installing anything.
 - [START-HERE.md](START-HERE.md): shortest installation path.
 - [INSTALL-WITH-AI.md](INSTALL-WITH-AI.md): complete copy-paste installation prompt.
 - [docs/USAGE.md](docs/USAGE.md): tool calls and task metadata.
