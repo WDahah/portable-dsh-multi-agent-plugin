@@ -58,7 +58,10 @@ export function expectedHold(request,priorRounds) {
   return expectedCost(input,request.route.maxTokens,request.route.costRates);
 }
 function normalizeRecord(r, owner, task, revision) {
-  exact(r,['version','owner','task','revision','status','request','requestHash','rounds','spentMicros','heldMicros','costUnknown']);
+  // evidence is optional so records written before it existed stay readable. It sits at
+  // record level rather than inside request, because it authorizes the run rather than
+  // forming part of the request that requestHash covers.
+  closed(r,['version','owner','task','revision','status','request','requestHash','rounds','spentMicros','heldMicros','costUnknown'],['evidence']);
   need(r.version === 3 && r.owner === owner && r.task === task && r.revision === revision && integer(revision) && revision >= 1 && revision <= MAX_REVISIONS, 'IDENTITY_MISMATCH');
   need(STATUSES.includes(r.status), 'INVALID_STATUS');
   const request = normalizeRequest(r.request), requestHash = digest(JSON.stringify(request));
@@ -95,11 +98,27 @@ function normalizeRecord(r, owner, task, revision) {
   if (['ATTEMPT_COMMITTED','RUNNING','INTERRUPTED_UNCERTAIN'].includes(r.status)) need(rounds.length && rounds.at(-1).status === r.status, 'INVALID_STATE');
   if (r.status === 'CONTINUATION_READY') need(rounds.length && rounds.at(-1).status === 'COMPLETED' && rounds.at(-1).finish === 'max-tokens' && rounds.at(-1).visibleText.trim().length > 0 && rounds.length < request.maxRounds, 'INVALID_CONTINUATION');
   if (['COMPLETED','NO_PROGRESS'].includes(r.status)) need(rounds.length && rounds.at(-1).status === 'COMPLETED', 'INVALID_TERMINAL');
-  return {version:3,owner,task,revision,status:r.status,request,requestHash,rounds,spentMicros:spent,heldMicros:held,costUnknown:unknown};
+  const normalized = {version:3,owner,task,revision,status:r.status,request,requestHash,rounds,spentMicros:spent,heldMicros:held,costUnknown:unknown};
+  if (r.evidence !== undefined && r.evidence !== null) {
+    exact(r.evidence,['evidenceId','issuedAt','expiresAt','runtimeBuildId','adapterFingerprint','domainEvidence','imagePassed','allowedDataClasses','caseResults','attestedBy']);
+    need(typeof r.evidence.evidenceId==='string'&&/^e[a-f0-9]{31}$/.test(r.evidence.evidenceId),'INVALID_EVIDENCE');
+    need(integer(r.evidence.issuedAt)&&integer(r.evidence.expiresAt)&&r.evidence.expiresAt>r.evidence.issuedAt,'INVALID_EVIDENCE');
+    need(typeof r.evidence.domainEvidence==='boolean'&&typeof r.evidence.imagePassed==='boolean','INVALID_EVIDENCE');
+    need(Array.isArray(r.evidence.allowedDataClasses)&&Array.isArray(r.evidence.caseResults),'INVALID_EVIDENCE');
+    normalized.evidence={evidenceId:r.evidence.evidenceId,issuedAt:r.evidence.issuedAt,expiresAt:r.evidence.expiresAt,
+      runtimeBuildId:r.evidence.runtimeBuildId??null,adapterFingerprint:r.evidence.adapterFingerprint??null,
+      domainEvidence:r.evidence.domainEvidence,imagePassed:r.evidence.imagePassed,
+      allowedDataClasses:[...r.evidence.allowedDataClasses],caseResults:[...r.evidence.caseResults],
+      attestedBy:r.evidence.attestedBy??null};
+  }
+  return normalized;
 }
 function validateTransition(before, after) {
   if (!before) {need(after.revision===1&&after.status==='PLANNED'&&after.rounds.length===0,'INVALID_INITIAL_STATE');return;}
   need(after.revision===before.revision+1&&after.requestHash===before.requestHash,'REQUEST_MUTATED');
+  // Evidence records what authorized this task at plan time; it cannot be added, removed,
+  // or edited later, or a run could be made to look authorized after the fact.
+  need(JSON.stringify(before.evidence??null)===JSON.stringify(after.evidence??null),'EVIDENCE_MUTATED');
   const transitions={PLANNED:['ATTEMPT_COMMITTED','PARTIAL_LIMIT'],ATTEMPT_COMMITTED:['RUNNING','INTERRUPTED_UNCERTAIN'],RUNNING:['RUNNING','CONTINUATION_READY','COMPLETED','PARTIAL_LIMIT','NO_PROGRESS','INTERRUPTED_UNCERTAIN'],CONTINUATION_READY:['ATTEMPT_COMMITTED','PARTIAL_LIMIT'],COMPLETED:[],PARTIAL_LIMIT:[],NO_PROGRESS:[],INTERRUPTED_UNCERTAIN:[]};
   need(transitions[before.status].includes(after.status),'STATE_ROLLBACK');
   const commits=after.status==='ATTEMPT_COMMITTED';need(after.rounds.length===before.rounds.length+(commits?1:0),'ROUND_RESET');

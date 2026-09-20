@@ -15,7 +15,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "80f203b89f588bdb38c803747721c1b2efb53cec96383f8f740755c0e684029e"
+      "sha256": "b2101a54a520df75c053d27e968d824eabb02dc99f00eb01928dc157c6b02cf3"
     },
     {
       "path": "CONTRIBUTING.md",
@@ -55,7 +55,7 @@
     },
     {
       "path": "docs/USAGE.md",
-      "sha256": "58475475663877408b6c698070d5fc35101250f5af9b8f33633be1681c5b19c9"
+      "sha256": "76720d6b441feb255a7e6d2d41ea0270fd069b2c8e51ebc2980074d89cbba043"
     },
     {
       "path": "examples/PROJECT-PROMPT.md",
@@ -71,7 +71,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "5ba7d0908ed4afe433cbf1b0c2db445b5b707d8ba3144a7781a9d8a6924eb97d"
+      "sha256": "f90195ec413d9c095bedef137f4c0c58025b672b4b35d3278091d37abcf6d182"
     },
     {
       "path": "scripts/doctor.mjs",
@@ -91,7 +91,7 @@
     },
     {
       "path": "src/agent-dispatch.mjs",
-      "sha256": "22a5458b392c14b14a0f02b263b58674a9f245c35aaea701f397aee16f89f63d"
+      "sha256": "142e9b6af2c9bf304149076e8428324483fb842297d4e8ea4a6824fbe3402a88"
     },
     {
       "path": "src/cancellation.mjs",
@@ -99,15 +99,15 @@
     },
     {
       "path": "src/engine.mjs",
-      "sha256": "c964724a9a8e21b986e6abe849c9c556eeaa5df301f58eca91c68d08f60010ed"
+      "sha256": "6a47af7c8105b1c02eb1dd5531808e9fe57227edb162661f5f172298ae6e7794"
     },
     {
       "path": "src/journal.mjs",
-      "sha256": "ec760f78f987d8ff73d0f24a23800bcaf188149c2c4b83b33f8447f652baef25"
+      "sha256": "fb46cbf9ba7efd31e41aa5cc30e37744b36573d89cec4cfb6abd732f29ba87e9"
     },
     {
       "path": "src/plugin.mjs",
-      "sha256": "97355388f11f05fa28a4354d7207d891c81f2bc390d6edc9522fa65a1bca7c96"
+      "sha256": "50f857b59a471a5b3457be5662531cbab7f7b27c321b411f70c80fdcdc2405be"
     },
     {
       "path": "src/probes.mjs",
@@ -115,11 +115,11 @@
     },
     {
       "path": "src/qualification.mjs",
-      "sha256": "4c01da4eb0109226c6525a62067fb761bb464548d9c15afd4caee84e0e5209cf"
+      "sha256": "6f1b78bdd056732bec749b21331205a52107c9bac25c03037c42ed2d77979093"
     },
     {
       "path": "src/routes.mjs",
-      "sha256": "6478ce048517f4616291604721420571f6ecf51f5c974f298f52c376c1ff09e2"
+      "sha256": "52404c154f2eb38f7b47711b0df46a24b0693f1ad4a99b4ce9db2fea4be047aa"
     },
     {
       "path": "tests/attribution.test.mjs",
@@ -140,6 +140,10 @@
     {
       "path": "tests/engine.test.mjs",
       "sha256": "b46b657c04778d04647f0b8a3db4cc82835666fbcf091299cb6bdda4e0f1f2ac"
+    },
+    {
+      "path": "tests/evidence.test.mjs",
+      "sha256": "c4b6a5b007f5f86bc4250e31c6bb521a5c815cca8bfc1a48e58621e0c08a9784"
     },
     {
       "path": "tests/helpers/tmp.mjs",

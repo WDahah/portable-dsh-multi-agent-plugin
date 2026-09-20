@@ -1,4 +1,4 @@
-import {createRecordStore, keyOf, need, scopedSignal, visibleOutput} from './qualification.mjs';
+import {createRecordStore, keyOf, need, normalizeEvidence, scopedSignal, visibleOutput} from './qualification.mjs';
 
 const READ_ONLY = new Set(['read', 'glob', 'grep', 'orchestrator_qualification_echo']);
 const KNOWN_TOOLS = new Set([...READ_ONLY, 'write', 'edit', 'pwsh']);
@@ -29,6 +29,9 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
         prompt: args.prompt, allowed_tools: [...tools], max_rounds: maxRounds, max_tokens: maxTokens,
         state: 'PLANNED', rounds: [], visibleText: '', cost_unknown: true, soft_target_usd: 1,
         hard_budget_cap: false, approval_required: false, automatic_retry: false, continuation_safe: safeContinuation,
+        // The evidence that authorized this dispatch, so the record answers what permitted
+        // the run and not only which model answered it.
+        evidence: normalizeEvidence(args.evidence),
         createdAt: Date.now(), deadlineAt: Date.now() + deadlineMs};
       await save();
       scope = scopedSignal(exec.signal, deadlineMs); controllers.add(scope.controller);
@@ -93,6 +96,9 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
       // The child-agent result contract carries no usage, so no token count exists to
       // report here. Naming the reason keeps an unknown cost from reading as a free one.
       usage: null, usage_reason: 'CHILD_RESULT_CARRIES_NO_USAGE', soft_target_usd: 1,
+      // A record written before evidence was linked reports null rather than a fabricated
+      // link, and says so through evidence_recorded.
+      evidence: record.evidence ?? null, evidence_recorded: record.evidence != null,
       approval_required: false, automatic_retry: false, continuation_safe: record.continuation_safe, continuation_uses_new_child: true};
   }
   async function read(runId, offset = 0) {
@@ -109,7 +115,8 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
       .map(record => ({run_id: record.run_id, state: record.state, provider: record.provider, model: record.model,
         effort: record.effort, rounds: Array.isArray(record.rounds) ? record.rounds.length : 0,
         total_chars: typeof record.visibleText === 'string' ? record.visibleText.length : 0,
-        allowed_tools: [...(record.allowed_tools ?? [])], created_at: record.createdAt ?? null}))
+        allowed_tools: [...(record.allowed_tools ?? [])], created_at: record.createdAt ?? null,
+        evidence_id: record.evidence?.evidenceId ?? null, evidence_recorded: record.evidence != null}))
       .sort((a, b) => (b.created_at ?? 0) - (a.created_at ?? 0));
   }
   /** Delete one saved assignment. A run in flight is refused rather than deleted beneath

@@ -4,6 +4,37 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.5.0
+
+### Added
+
+- **Saved runs record the evidence that authorized them.** A record named which model
+  answered but not what permitted it, so questions like "was this run authorized by
+  evidence that had already expired?" or "whose attestation allowed this confidential
+  task?" could not be answered from storage. Delegations and direct tasks now carry an
+  `evidence` block holding the evidence id, its issue and expiry, the passed probe cases,
+  allowed data classes, domain evidence, and the attesting operator when one widened
+  policy.
+- An evidence id is **derived from the evidence** rather than assigned, so a link is
+  checkable: recomputing it from the qualification a record names must reproduce the
+  stored id.
+
+### Changed
+
+- Direct-task journal records may carry an optional `evidence` block, fixed at plan time.
+  The journal refuses any later addition, edit, or removal (`EVIDENCE_MUTATED`), so a run
+  cannot be made to look authorized after the fact, and a malformed block is refused
+  rather than silently ignored.
+- Records written by earlier versions remain readable and report a null `evidence` with a
+  false `evidence_recorded`, rather than a fabricated link.
+
+### Upgrading
+
+Reading is one-way, as in 1.2.0. This version reads journals written by 1.0.x through
+1.4.x, but **older versions reject journals written by this one**, because their record
+schema admits no `evidence` field. Finish or abandon in-flight direct tasks before
+downgrading.
+
 ## 1.4.0
 
 ### Added

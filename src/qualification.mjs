@@ -11,6 +11,17 @@ export const ATTESTABLE_DATA_CLASSES = Object.freeze(['public', 'internal', 'con
 export const CAPABILITY_PROBES = Object.freeze(['image', 'structured-output']);
 const sha = value => createHash('sha256').update(value).digest('hex');
 export const keyOf = value => 'x' + sha(value);
+/** Identity of one exact probe, derived from the evidence itself rather than assigned.
+ * Being recomputable is the point: a run's recorded link can be checked against the
+ * evidence it names instead of being taken on trust. */
+export function evidenceIdOf(record) {
+  if (!record || typeof record !== 'object') return null;
+  const {provider, model, effort, issuedAt} = record;
+  const runtimeId = record.issuer?.runtimeId;
+  if (typeof provider !== 'string' || typeof model !== 'string' || typeof effort !== 'string') return null;
+  if (!Number.isSafeInteger(issuedAt) || typeof runtimeId !== 'string' || !runtimeId) return null;
+  return 'e' + sha([provider, model, effort, issuedAt, runtimeId].join('\0')).slice(0, 31);
+}
 export function need(value, code = 'BRIDGE_REFUSED') {if (!value) throw Object.assign(new Error(code), {code});}
 export function scopedSignal(parent, milliseconds) {
   parent.throwIfAborted();
@@ -103,6 +114,25 @@ export function visibleOutput(output) {
   return text;
 }
 const nonempty = (value, max = 256) => typeof value === 'string' && value.trim().length > 0 && value.length <= max;
+/** Reduce a selection's evidence to the owned, storable fields. Returns null when the
+ * caller supplied none, which is how a run started without recorded evidence reports
+ * itself rather than inventing a link it never had. */
+export function normalizeEvidence(input) {
+  if (!input || typeof input !== 'object' || Array.isArray(input)) return null;
+  const {evidenceId, issuedAt, expiresAt} = input;
+  if (typeof evidenceId !== 'string' || !/^e[a-f0-9]{31}$/.test(evidenceId)) return null;
+  if (!Number.isSafeInteger(issuedAt) || !Number.isSafeInteger(expiresAt)) return null;
+  return {
+    evidenceId, issuedAt, expiresAt,
+    runtimeBuildId: typeof input.runtimeBuildId === 'string' ? input.runtimeBuildId : null,
+    adapterFingerprint: typeof input.adapterFingerprint === 'string' ? input.adapterFingerprint : null,
+    domainEvidence: input.domainEvidence === true,
+    imagePassed: input.imagePassed === true,
+    allowedDataClasses: Array.isArray(input.allowedDataClasses) ? input.allowedDataClasses.filter(c => typeof c === 'string') : [],
+    caseResults: Array.isArray(input.caseResults) ? input.caseResults.filter(c => typeof c === 'string') : [],
+    attestedBy: nonempty(input.attestedBy) ? input.attestedBy.trim() : null,
+  };
+}
 /** Validate an operator attestation. Absent is normal; malformed is refused outright so
  * a typo silently widens nothing. This records a human claim; it proves no capability. */
 export function normalizeAttestation(input) {
