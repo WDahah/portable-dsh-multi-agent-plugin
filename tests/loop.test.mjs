@@ -73,6 +73,52 @@ test('a verdict is accepted from the schema channel or exact JSON, never from pr
   for (const unsupported of ['pattern', 'format', 'minimum', 'maximum', 'oneOf', 'anyOf']) assert.equal(keywords.has(unsupported), false);
   assert.deepEqual(VERDICTS, ['verified', 'partial', 'failed', 'needs-clarification']);
 });
+test('a verdict that disagrees with itself stops the loop', () => {
+  const incoherent = state => loopDecision({verdict: parseVerdict({structured: state}), cycle: 1, maxCycles: 3, canWrite: false});
+  // Approving work while reporting it missed its objective is not a decision to act on.
+  const offObjective = incoherent(verdict({verdict: 'verified', onObjective: false, findings: []}));
+  assert.equal(offObjective.state, 'VERDICT_INCOHERENT');
+  assert.deepEqual(offObjective.contradictions, ['VERIFIED_BUT_OFF_OBJECTIVE']);
+  // Nor is approving work that still carries a blocker.
+  assert.equal(incoherent(verdict({verdict: 'verified', findings: [{severity: 'blocker', detail: 'Still broken.'}]})).state, 'VERDICT_INCOHERENT');
+  // Nor is asking for clarification without asking anything.
+  assert.equal(incoherent(verdict({verdict: 'needs-clarification', clarifications: []})).state, 'VERDICT_INCOHERENT');
+  // Neither outcome is inferred: the loop reports the disagreement and stops.
+  assert.equal(offObjective.continue, false);
+  // A coherent verdict is unaffected.
+  assert.equal(incoherent(verdict({verdict: 'verified', findings: [{severity: 'minor', detail: 'A nit.'}]})).state, 'VERIFIED');
+});
+test('a contradiction survives the limits that trim a verdict', () => {
+  // The cap on findings must not decide whether a contradiction exists: a reviewer with
+  // fifty nits and one blocker is still reporting a blocker.
+  const padded = [...Array(50)].map((_, index) => ({severity: 'minor', detail: `nit ${index}`}));
+  const buried = parseVerdict({structured: verdict({verdict: 'verified', findings: [...padded, {severity: 'blocker', detail: 'Buried.'}]})});
+  assert.ok(buried.contradictions.includes('VERIFIED_WITH_BLOCKER'));
+  assert.equal(loopDecision({verdict: buried, cycle: 1, maxCycles: 3, canWrite: false}).state, 'VERDICT_INCOHERENT');
+  // Nor may a blocker vanish because its detail was too long to store.
+  const overlong = parseVerdict({structured: verdict({verdict: 'verified', findings: [{severity: 'blocker', detail: 'x'.repeat(2100)}]})});
+  assert.ok(overlong.contradictions.includes('VERIFIED_WITH_BLOCKER'));
+  // What normalization discarded is reported rather than left to be discovered.
+  assert.ok(buried.normalized.some(entry => entry.startsWith('FINDINGS_DROPPED:')));
+  assert.deepEqual(parseVerdict({structured: verdict({verdict: 'partial'})}).normalized, []);
+  assert.ok(parseVerdict({structured: verdict({verdict: 'partial', summary: 'x'.repeat(900)})}).normalized.includes('SUMMARY_TRUNCATED'));
+});
+test('a verdict from a review that did not finish is not acted on', () => {
+  const declared = parseVerdict({structured: verdict({verdict: 'verified', findings: []})});
+  const truncated = loopDecision({verdict: declared, cycle: 1, maxCycles: 3, canWrite: false, reviewState: 'PARTIAL'});
+  assert.equal(truncated.state, 'REVIEW_DID_NOT_COMPLETE');
+  assert.equal(truncated.continue, false);
+  // A completed review is unaffected, and an omitted state stays backward compatible.
+  assert.equal(loopDecision({verdict: declared, cycle: 1, maxCycles: 3, canWrite: false, reviewState: 'COMPLETED'}).state, 'VERIFIED');
+  assert.equal(loopDecision({verdict: declared, cycle: 1, maxCycles: 3, canWrite: false}).state, 'VERIFIED');
+});
+test('the reviewer is told the consistency rule it will be held to', () => {
+  const instruction = verdictInstruction([]);
+  assert.match(instruction, /do not return "verified" alongside/);
+  assert.match(instruction, /without at least one question/);
+  // The rule is stated as a contract, not enforced by reinterpreting the answer.
+  assert.match(instruction, /stops the loop rather than/);
+});
 test('the loop continues only on a declared revisable verdict', () => {
   // A needs-clarification verdict has to carry the question it needs answered, so the
   // fixture supplies one rather than asserting on a self-contradictory verdict.

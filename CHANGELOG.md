@@ -4,6 +4,45 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.12.0
+
+Found by dispatching this project to an outside model for review, then asking that model to
+propose fixes for what it found. It located a hole in the first fix.
+
+### Fixed
+
+- **A self-contradictory verdict was treated as a pass.** A reviewer could return
+  `verified` while also reporting `onObjective: false`, or leaving a `blocker` finding
+  standing, and the loop accepted it. Such a verdict now stops the loop with
+  `VERDICT_INCOHERENT` and lists the contradictions. This compares the reviewer's own
+  fields against each other, which is structural: neither reading is inferred, and the
+  plugin still never judges the work.
+- **The contradiction check read the wrong data.** The first fix inspected findings after
+  normalization, so a blocker past the fifty-finding cap, or one whose detail exceeded the
+  length limit, disappeared and the verdict passed — failing precisely when a reviewer had
+  the most to say. It now reads what the reviewer declared.
+- **A verdict from an unfinished review was accepted.** `loopDecision` now stops with
+  `REVIEW_DID_NOT_COMPLETE` rather than treating a truncated opinion as a settled one.
+- **`orchestrator_iterate` lost the task when no objective was passed.** It forwarded only
+  `args.objective`, while a reviser is deliberately not re-sent the original request
+  because the objective is supposed to carry it. With neither, a loop could converge on
+  satisfying review feedback while drifting from the user's actual request. It now inherits
+  the objective the reviewed assignment recorded, reports `objectiveSource`, and falls
+  back to giving the reviser the original request when no objective exists at all.
+
+### Added
+
+- Verdicts report `normalized`, naming what storage limits cost — for example
+  `SUMMARY_TRUNCATED` or `FINDINGS_DROPPED:1`. The README previously described stored
+  verdicts as verbatim, which was never true of a record that trims and caps.
+- `verdictInstruction` states the consistency contract, so a reviewer can satisfy the rule
+  rather than trip a check it was never told about.
+
+### Unchanged
+
+Well-formed verdicts behave exactly as before, verified across every state and cycle
+position. Only verdicts that disagree with themselves, or come from reviews that did not
+finish, reach a different outcome.
 ## 1.11.0
 
 Acting on user feedback about task selection. Two of the four proposals were already

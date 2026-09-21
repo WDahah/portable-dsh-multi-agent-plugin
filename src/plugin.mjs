@@ -223,6 +223,9 @@ export function createPlugin(defineTool) {
         }
         return {run_id: args.run_id, cycles, finalSubject: subjectId, stopped: decision?.state ?? 'NO_CYCLES',
           writesPermitted: canWrite, maxCycles,
+          // Where the objective every cycle was judged against came from. NONE means the
+          // loop had only the findings and the original request to work from.
+          objectiveSource, objective: objective ?? null,
           // Compaction is reported whenever it was requested, including when it was not
           // applied, so a caller can see what the cheap call bought.
           ...(args.compact === true ? {compactions, compactorAvailable: compactor?.status === 'SELECTED'} : {}),

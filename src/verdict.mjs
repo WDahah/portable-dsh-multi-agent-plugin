@@ -42,6 +42,10 @@ export function verdictInstruction(criteria = []) {
     '  "findings": what must change, each {"severity":"blocker|major|minor|note","detail":"..."}.',
     '  "clarifications": questions you need answered. Do not guess at an unstated requirement — list it here.',
     '  "verified": acceptance criteria you actually confirmed.',
+    'Keep the fields consistent with each other: do not return "verified" alongside',
+    '"onObjective": false or a "blocker" finding, and do not return "needs-clarification"',
+    'without at least one question. A self-contradictory answer stops the loop rather than',
+    'being resolved for you, so say what you mean in the verdict field itself.',
     checks,
   ].join('\n');
 }
@@ -87,10 +91,19 @@ export function parseVerdict({structured, output} = {}) {
   // objective, or that a blocker is still standing. Noticing that compares the reviewer's
   // own fields against each other, which is structural rather than a judgement about the
   // work, so the contradiction is recorded instead of being resolved or ignored.
+  //
+  // The check reads what the reviewer declared, not what survived normalization. A blocker
+  // past the array cap, or one whose detail was too long to keep, is still a blocker the
+  // reviewer raised: letting the cap decide would make a contradiction disappear precisely
+  // when the reviewer had the most to say.
+  const declaredFindings = Array.isArray(candidate.findings) ? candidate.findings : [];
+  const declaredBlocker = declaredFindings.some(finding => finding?.severity === 'blocker');
+  const declaredClarifications = Array.isArray(candidate.clarifications)
+    ? candidate.clarifications.some(entry => typeof entry === 'string' && entry.trim()) : false;
   const contradictions = [];
   if (candidate.verdict === 'verified' && candidate.onObjective === false) contradictions.push('VERIFIED_BUT_OFF_OBJECTIVE');
-  if (candidate.verdict === 'verified' && findings.some(finding => finding.severity === 'blocker')) contradictions.push('VERIFIED_WITH_BLOCKER');
-  if (candidate.verdict === 'needs-clarification' && !clarifications.length) contradictions.push('CLARIFICATION_WITHOUT_QUESTION');
+  if (candidate.verdict === 'verified' && declaredBlocker) contradictions.push('VERIFIED_WITH_BLOCKER');
+  if (candidate.verdict === 'needs-clarification' && !declaredClarifications) contradictions.push('CLARIFICATION_WITHOUT_QUESTION');
   return {
     verdict: candidate.verdict,
     onObjective: candidate.onObjective,
@@ -102,8 +115,12 @@ export function parseVerdict({structured, output} = {}) {
     // model that merely happened to emit valid JSON.
     source: structured ? 'schema' : 'text',
     // What the stored verdict no longer says exactly as the reviewer said it. The record is
-    // normalized, not verbatim, and a reader should not have to discover that by comparing.
-    normalized: summary.length > 500 ? ['SUMMARY_TRUNCATED'] : [],
+    // normalized, not verbatim, and a reader should not have to discover that by comparing
+    // against something they no longer have.
+    normalized: [
+      ...(summary.length > 500 ? ['SUMMARY_TRUNCATED'] : []),
+      ...(declaredFindings.length > findings.length ? [`FINDINGS_DROPPED:${declaredFindings.length - findings.length}`] : []),
+    ],
     contradictions,
   };
 }
