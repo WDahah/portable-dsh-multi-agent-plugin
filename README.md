@@ -10,6 +10,24 @@
 
 This is a native plugin for a compatible DeepSeek Harness (DSH)/Cordis host — not a standalone agent framework. It routes each task to a model that has actually been tested for it, runs the work in a scoped child agent, and keeps a durable record of what was asked, which model answered, and what authorized the run.
 
+## The problem it solves
+
+You pay for several AI subscriptions. Every task goes to whichever model you happened to type, work comes back with no record of who did it or why you should believe it, and when you ask a model to check its own output it approves it — because a model reviewing itself has its own blind spots.
+
+This turns that into something with rules:
+
+- **Tasks go where they fit.** A routine task does not reach your most expensive model because you called it complex.
+- **Reviews go somewhere else.** A review prefers a different provider than the work it judges, and says so when it cannot.
+- **Nothing passes by assumption.** A model must pass a probe in your session before it can be selected, a reviewer must *declare* a verdict, and a loop that runs out of attempts reports `UNCONVERGED` rather than "done".
+
+### Is it for you?
+
+**Yes, if** you use two or more model providers, want an audit trail of which model did what and on what authority, and would rather a task refuse than quietly run on something unverified.
+
+**No, if** you need a hosted product, a standalone framework, or a hard spending cap. It requires a running DSH/Cordis host; it is not `npm install`-able on its own.
+
+**Not sure?** Run the demo below. It works without any of that.
+
 ## Try the routing logic without installing anything
 
 The parts that decide *which model runs what, and whether a result can be trusted* have no host calls and no dependencies. You can watch them work in about ten seconds:
@@ -123,6 +141,22 @@ A review-and-revise loop is 5–6 model calls, and a naive implementation re-sen
 
 Optional compaction shaves more as artifacts grow: 9% at 3,000 characters, 16% at 12,000, 18% at 24,000.
 
+### 8. Use the subscriptions you are already paying for
+
+Pools are priority-ordered, so by default the first qualified route takes every task — reproducible, and easy to misread as load balancing. It never was. `orchestrator_capacity` now says so directly:
+
+```json
+{"selects": "codex/gpt-5.6-sol",
+ "idle": ["claude/claude-opus-5", "kimi-coding/k3"],
+ "spreadWouldUse": ["codex/gpt-5.6-sol", "claude/claude-opus-5", "kimi-coding/k3"]}
+```
+
+`spread: true` rotates across every qualified route — measured **100/0/0 → 33/33/34** — keyed by `run_id`, so the same request still resolves the same way. Distribution without giving up reproducibility.
+
+`failover: true` lets a run move to an idle route when a provider refuses. Deliberately narrow: the refusal must have arrived **before** the child produced anything, and the tool scope must be read-only. Anything else records why it stayed put rather than risking a repeated side effect.
+
+Neither is automatic, because a hidden rule deciding where your work went is worth less than a rule you can predict.
+
 ## A first task
 
 Read-only, and the model is chosen for you:
@@ -173,7 +207,25 @@ Being clear about this matters more than the feature list, because every claim a
 - **It does not run several models in parallel on one task.** One delegation is one scoped child at a time; a review is a separate run, not a second opinion fetched concurrently.
 - **Agents do not talk to each other.** The host caps delegation at one level, and every hand-off is recorded through the parent as data. There is no side channel whose outcome escapes the journal.
 
+## How it was built
+
+Worth knowing before you trust any of the numbers above.
+
+This was written by an AI agent under human direction, and the figures come from measurements rather than estimates — including two that came back worse than predicted. A projected token saving was wrong because it counted cycles instead of model calls; the measured figure replaced it and the mistake is recorded in [the design notes](docs/DESIGN-NOTES.md). An early draft of the routing change sent routine work to the cheapest tier and was reverted before release when the tests showed it turned ordinary tasks into refusals.
+
+The quickstart above is three lines rather than one because a reader hit a parse error in Windows PowerShell running what the README told them to run. The escalation rule changed because a reader pointed out that qualifying more models did not give them work.
+
+That is the pattern worth judging the project by: claims here are measured, corrections are kept visible, and the bugs users actually hit are the ones that shaped it.
+
 ## Start here
+
+**Just looking?** Run `node demo.mjs` — ten seconds, no install, no host.
+
+**Want the reasoning?** [docs/DESIGN-NOTES.md](docs/DESIGN-NOTES.md) is written to be useful even if you never install this.
+
+**Ready to use it?** [START-HERE.md](START-HERE.md), then qualify a route and send one read-only task.
+
+**Found something wrong?** [Open an issue](https://github.com/WDahah/portable-dsh-multi-agent-plugin/issues). Several releases exist because someone did.
 
 - [demo.mjs](demo.mjs): run the routing and verdict logic with no host — `node demo.mjs`.
 - [docs/DESIGN-NOTES.md](docs/DESIGN-NOTES.md): the decisions and what they cost, readable without installing anything.
