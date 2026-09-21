@@ -74,7 +74,12 @@ test('a verdict is accepted from the schema channel or exact JSON, never from pr
   assert.deepEqual(VERDICTS, ['verified', 'partial', 'failed', 'needs-clarification']);
 });
 test('the loop continues only on a declared revisable verdict', () => {
-  const decide = (state, cycle = 1) => loopDecision({verdict: state ? parseVerdict({structured: verdict({verdict: state})}) : null, cycle, maxCycles: 3, canWrite: false});
+  // A needs-clarification verdict has to carry the question it needs answered, so the
+  // fixture supplies one rather than asserting on a self-contradictory verdict.
+  const extra = state => (state === 'needs-clarification' ? {clarifications: ['Which auth method?']} : {});
+  const decide = (state, cycle = 1) => loopDecision({
+    verdict: state ? parseVerdict({structured: verdict({verdict: state, ...extra(state)})}) : null,
+    cycle, maxCycles: 3, canWrite: false});
   assert.equal(decide('verified').state, 'VERIFIED');
   assert.equal(decide('verified').continue, false);
   assert.equal(decide('needs-clarification').state, 'NEEDS_CLARIFICATION');
@@ -215,7 +220,7 @@ test('a useless compaction is reported and the original is kept', async t => {
 test('a reviser is not re-sent the original request it already has as an objective', () => {
   const subject = {run_id: 's', provider: 'codex', model: 'm', effort: 'high', prompt: 'ORIGINAL REQUEST', visibleText: 'THE ANSWER'};
   const forReview = reviewMaterial(subject);
-  const forRevision = reviewMaterial(subject, {forRevision: true});
+  const forRevision = reviewMaterial(subject, {forRevision: true, hasObjective: true});
   assert.ok(forReview.includes('ORIGINAL REQUEST'));
   // The reviser gets the answer to change, not a second copy of the request.
   assert.equal(forRevision.includes('ORIGINAL REQUEST'), false);
