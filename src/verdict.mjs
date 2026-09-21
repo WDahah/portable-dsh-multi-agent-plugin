@@ -1,4 +1,5 @@
-// A verdict is a reviewer's own declaration, recorded verbatim and never interpreted.
+// A verdict is a reviewer's own declaration, normalized to storage bounds with losses
+// reported. Its declared state is preserved; the plugin never re-judges the work.
 // The plugin decides whether a loop may continue from the declared state; it never reads
 // prose to infer whether work is acceptable, because that judgement is not its to make.
 
@@ -87,6 +88,7 @@ export function parseVerdict({structured, output} = {}) {
     : [];
   const summary = candidate.summary.trim();
   const clarifications = strings(candidate.clarifications, 1000, 25);
+  const verified = strings(candidate.verified, 500, 50);
   // A verdict can contradict itself: approving work while also reporting that it missed its
   // objective, or that a blocker is still standing. Noticing that compares the reviewer's
   // own fields against each other, which is structural rather than a judgement about the
@@ -110,7 +112,7 @@ export function parseVerdict({structured, output} = {}) {
     summary: summary.slice(0, 500),
     findings,
     clarifications,
-    verified: strings(candidate.verified, 500, 50),
+    verified,
     // Records how the verdict arrived, so a host-enforced one is distinguishable from a
     // model that merely happened to emit valid JSON.
     source: structured ? 'schema' : 'text',
@@ -120,6 +122,10 @@ export function parseVerdict({structured, output} = {}) {
     normalized: [
       ...(summary.length > 500 ? ['SUMMARY_TRUNCATED'] : []),
       ...(declaredFindings.length > findings.length ? [`FINDINGS_DROPPED:${declaredFindings.length - findings.length}`] : []),
+      ...(Array.isArray(candidate.clarifications) && candidate.clarifications.length > clarifications.length
+        ? [`CLARIFICATIONS_DROPPED:${candidate.clarifications.length - clarifications.length}`] : []),
+      ...(Array.isArray(candidate.verified) && candidate.verified.length > verified.length
+        ? [`VERIFIED_DROPPED:${candidate.verified.length - verified.length}`] : []),
     ],
     contradictions,
   };

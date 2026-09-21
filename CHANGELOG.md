@@ -4,6 +4,51 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.13.0
+
+A second round of outside review found five more defects. Three are honesty defects: the
+record could claim something that was not so.
+
+### Fixed
+
+- **A review that failed over could claim independence from the provider it ran on.** A
+  failover updated the provider, model and evidence but left `independence` as computed
+  for the route that never ran, so a review avoiding one provider could move onto it and
+  still record `independent: true`. Independence is now recomputed against the route that
+  actually ran, with `FAILOVER_TO_AVOIDED_PROVIDER` as the reason, and the failover entry
+  keeps `independence_before` and `independence_after`. This was a false claim in the
+  feature the project leads with.
+- **A reviser lost the original request.** `reviewMaterial()` dropped it whenever any
+  objective existed, but a short objective need not carry the path restrictions or
+  prohibitions written into the original prompt, and after one revision `subject.prompt`
+  is the revise prompt rather than the request. An immutable `original_prompt` now travels
+  with the assignment.
+- **A compaction could stand in for the work it summarized.** `compact()` accepted
+  parsable output without requiring the run to finish, and the loop replaced the review
+  subject with the compaction, so the next review measured independence against the
+  compactor rather than the author and `finalSubject` could name a summary. Compacted text
+  is now separate working context, and an unfinished compaction is refused with
+  `COMPACTION_DID_NOT_COMPLETE`.
+- **The record store could write past its own listing limit.** `entries()` refuses a
+  namespace holding more than 256 directories while `save()` did not enforce it, so the
+  257th assignment broke both listing and the deletion reference scan. A new key at capacity
+  is now refused with `JOURNAL_BOUND`; existing records stay updatable.
+- **Two bounded verdict fields reported no loss.** Dropped `clarifications` and
+  `verified` entries are now reported alongside summary and finding losses, and the claim
+  that verdicts are stored verbatim is gone from the last two places it survived.
+
+### How this release was produced
+
+The defects were found by a model from another provider reviewing the codebase, and the
+fixes were written by that same model. The fixes were then verified independently rather
+than accepted: each defect was reproduced first, each fix checked against that
+reproduction, and the eight new regression tests were run against the pre-fix commit to
+confirm they fail on the old code. Seven of eight did; the eighth guards a case that was
+always correct, against the fix overcorrecting.
+
+The model that wrote the fixes added no tests, reading a constraint about editing tests as
+a prohibition on adding them. That gap was filled during verification, which is the reason
+a proposal from a model is not the same as a change that can be trusted.
 ## 1.12.0
 
 Found by dispatching this project to an outside model for review, then asking that model to
