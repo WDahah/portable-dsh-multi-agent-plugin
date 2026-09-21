@@ -71,7 +71,10 @@ export function createPlugin(defineTool) {
       }, 190000);
     async function choose(args, exec, avoidProvider) {
       const entry = owned(exec);
-      const selected = selectRoute({task: args.task, qualifications: await entry.qualifications.list(), avoidProvider});
+      // Spreading is opt-in and keyed by the caller's own id, so the same request still
+      // resolves to the same route while different requests land on different ones.
+      const spread = args.spread === true ? String(args.run_id ?? args.task_id ?? '') : args.spread;
+      const selected = selectRoute({task: args.task, qualifications: await entry.qualifications.list(), avoidProvider, spread});
       return {entry, selected};
     }
     const task = {task: {type: 'json', required: true}};
@@ -93,7 +96,7 @@ export function createPlugin(defineTool) {
     register('orchestrator_read', 'Read persisted direct-task output and accounting without model dispatch.',
       {task_id: {type: 'string', required: true}, page: {type: 'integer'}}, (args, exec) => owned(exec).engine.read(args.task_id, args.page ?? 0));
     register('orchestrator_delegate', 'Select a qualified route and run a real scoped child agent. Automatic new-child continuation is restricted to readonly tool sets; no error retry.',
-      {...task, run_id: {type: 'string', required: true}, prompt: {type: 'string', required: true}, allowed_tools: {type: 'array', items: {type: 'string'}}, max_rounds: {type: 'integer'}, max_tokens: {type: 'integer'}, reviews: {type: 'string'}, objective: {type: 'json'}, expect_verdict: {type: 'boolean'}}, async (args, exec) => {
+      {...task, run_id: {type: 'string', required: true}, prompt: {type: 'string', required: true}, allowed_tools: {type: 'array', items: {type: 'string'}}, max_rounds: {type: 'integer'}, max_tokens: {type: 'integer'}, reviews: {type: 'string'}, objective: {type: 'json'}, expect_verdict: {type: 'boolean'}, spread: {type: 'boolean'}, failover: {type: 'boolean'}}, async (args, exec) => {
         need(enabled, 'DISABLED');
         // A review should not land on the model that produced the run it judges, so the
         // subject's provider is avoided when one can be found.
@@ -107,7 +110,9 @@ export function createPlugin(defineTool) {
         // into the session tree or the journal.
         return {selection: selected, delegation: await entry.agents.delegate(
           {...args, role: selected.role, intent: selected.intent, evidence: selected.qualification,
-            independence: selected.independence ?? null},
+            independence: selected.independence ?? null,
+            // Failover is opt-in; without it a refused route fails rather than moving.
+            alternates: args.failover === true ? selected.alternates : []},
           selected.route, selected.effort, exec)};
       }, 910000);
     register('orchestrator_delegate_read', 'Read immutable child-assignment output; never restarts the child.',
@@ -236,7 +241,20 @@ export function createPlugin(defineTool) {
             return view;
           });
           const ready = entries.filter(e => e.dispatchable);
+          // Pools are priority-ordered, not balanced, so only the first dispatchable route
+          // receives work. A count on its own implied that every qualified route shares the
+          // load, which is the opposite of what the selector does.
+          for (const [position, entry] of ready.entries()) {
+            entry.selected = position === 0;
+            if (position > 0) entry.idleReason = 'LOWER_PRIORITY_THAN_SELECTED';
+          }
           pools[pool] = {dispatchable: ready.length, total: entries.length,
+            selects: ready.length ? `${ready[0].provider}/${ready[0].model}` : null,
+            // Qualified and ready, but they will not run unless the caller asks to spread
+            // or the selected route refuses before starting any work.
+            idle: ready.slice(1).map(entry => `${entry.provider}/${entry.model}`),
+            spreadWouldUse: ready.length > 1 ? ready.map(entry => `${entry.provider}/${entry.model}`) : [],
+            failoverAvailable: ready.length > 1,
             // Distinct providers is what decides whether an independent review is possible.
             providers: [...new Set(ready.map(e => e.provider))],
             independentReviewPossible: new Set(ready.map(e => e.provider)).size >= 2,

@@ -4,6 +4,40 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.10.0
+
+Reported: qualifying every route in a pool did not make those routes receive work. That was
+correct behaviour and a genuine gap, because nothing said so and `orchestrator_capacity`
+implied otherwise.
+
+### Added
+
+- **`spread: true` distributes work across every qualified route in a pool.** Measured on
+  the advanced pool with three routes qualified: 100/0/0 by default, 33/33/34 with
+  spreading. The rotation is keyed by `run_id`, so the same request still resolves to the
+  same route — distribution without giving up reproducibility. It rotates only among routes
+  that already passed every evidence rule, and never overrides review independence.
+- **`failover: true` moves a run to a standby route when the first provider refuses.**
+  Deliberately narrow: the failure must be a refusal issued before the child started, the
+  child must have produced no output, and the tool scope must be read-only. Anything else
+  records the attempt with its reason and fails rather than risking a repeated side effect.
+  A run that moves is authorized by the new route's evidence, never the old one's.
+- A selection now reports `standby`, `selectionOrder`, and a
+  `LOWER_PRIORITY_ROUTES_IDLE_UNTIL_FAILOVER` warning whenever a qualified route is idle.
+
+### Fixed
+
+- **`orchestrator_capacity` implied that every dispatchable route shares the work.** Each
+  number it printed was true, and a reader would still conclude the wrong thing. It now
+  reports `selects`, `idle`, `spreadWouldUse`, and `failoverAvailable` per pool, and
+  marks each route `selected` or `LOWER_PRIORITY_THAN_SELECTED`.
+- The documentation never stated that pools are priority-ordered rather than balanced.
+
+### Unchanged
+
+Default routing is identical. All 238 role-and-variant outcomes from the previous build
+were replayed against this one and none changed: spreading and failover are opt-in, and a
+caller that asks for neither sees exactly what it saw before.
 ## 1.9.2
 
 ### Fixed

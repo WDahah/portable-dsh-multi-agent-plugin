@@ -2,6 +2,27 @@ import {createRecordStore, keyOf, need, normalizeEvidence, scopedSignal, visible
 import {COMPACTION_SCHEMA, VERDICT_SCHEMA, compactionInstruction, normalizeObjective, objectiveMaterial, parseCompaction, parseVerdict, verdictInstruction} from './verdict.mjs';
 
 const READ_ONLY = new Set(['read', 'glob', 'grep', 'orchestrator_qualification_echo']);
+/** A provider that refused before the child began is the only case where trying another
+ * route is safe: nothing ran, so nothing can be repeated. Anything that failed partway
+ * through may already have had an effect, and is never retried elsewhere. */
+const PRE_DISPATCH_REFUSALS = new Set([
+  'rate_limit', 'rate_limited', 'RATE_LIMIT', 'overloaded', 'insufficient_quota',
+  'quota_exceeded', 'service_unavailable', 'model_not_found', 'unauthorized',
+  'authentication_error', 'permission_denied',
+]);
+/** Decide whether a failed attempt may fall through to a standby route. The failure must
+ * name a refusal the provider issued up front, and the child must not have produced
+ * anything: visible output means work happened, whatever the error says afterwards. */
+export function canFailOver({failure, producedOutput, toolsCanWrite}) {
+  if (producedOutput) return {allowed: false, reason: 'CHILD_ALREADY_PRODUCED_OUTPUT'};
+  const code = typeof failure?.code === 'string' ? failure.code : null;
+  if (!code) return {allowed: false, reason: 'FAILURE_CODE_UNKNOWN'};
+  if (!PRE_DISPATCH_REFUSALS.has(code)) return {allowed: false, reason: 'NOT_A_PRE_DISPATCH_REFUSAL'};
+  // A write-capable child that reached the provider at all could have acted before the
+  // refusal was reported, so its scope decides rather than the error code alone.
+  if (toolsCanWrite) return {allowed: false, reason: 'WRITE_SCOPE_CANNOT_BE_REPEATED_BLIND'};
+  return {allowed: true, reason: 'PRE_DISPATCH_REFUSAL_NO_WORK_STARTED'};
+}
 const KNOWN_TOOLS = new Set([...READ_ONLY, 'write', 'edit', 'pwsh']);
 /** Human-readable child identity: role, exact route and effort, then the round. An intent
  * is appended when supplied, so a tree shows what the caller meant as well as how it ran. */
@@ -75,6 +96,8 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
       // an earlier run is not enough: a reviser also reads the work it revises, and must
       // return revised work rather than a judgement of it.
       const wantsVerdict = args.expect_verdict === true || (subject !== null && args.role === 'review');
+      // Qualified routes held in reserve, each with the evidence that authorized it.
+      const standby = Array.isArray(args.alternates) ? [...args.alternates] : [];
       const safeContinuation = tools.every(tool => READ_ONLY.has(tool));
       record = {schemaVersion: 1, run_id: args.run_id, owner, provider: route.provider, model: route.model, effort,
         prompt: args.prompt, allowed_tools: [...tools], max_rounds: maxRounds, max_tokens: maxTokens,
@@ -94,6 +117,9 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
         // The objective this run was held to, and the verdict it declared. A verdict is
         // stored exactly as returned: the plugin never rewrites or re-judges it.
         objective, verdict: null, verdict_source: null,
+        // Every failover attempt, allowed or refused, so the record shows which provider
+        // was asked first and why the run moved rather than only where it ended up.
+        failovers: [], standby_available: standby.length,
         createdAt: Date.now(), deadlineAt: Date.now() + deadlineMs};
       await save();
       scope = scopedSignal(exec.signal, deadlineMs); controllers.add(scope.controller);
@@ -133,6 +159,26 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
         round.child_id = run.id; round.state = 'RUNNING'; await save();
         const result = await run.result;
         let text = visibleOutput(result.output);
+        // A provider that refused before the child started is the one failure another
+        // qualified route can absorb. Each attempt carries its own evidence, so a failover
+        // is never dispatched on the strength of the previous route's qualification.
+        if (result.stopReason === 'error' && standby.length) {
+          const verdict = canFailOver({failure: result.error, producedOutput: !!text.trim(), toolsCanWrite: !safeContinuation});
+          record.failovers.push({from: `${route.provider}/${route.model}`, round: index + 1,
+            code: result.error?.code ?? null, allowed: verdict.allowed, reason: verdict.reason,
+            to: verdict.allowed ? `${standby[0].route.provider}/${standby[0].route.model}` : null});
+          if (verdict.allowed) {
+            const next = standby.shift();
+            round.state = 'FAILED_OVER'; round.failover_reason = result.error?.code ?? 'error';
+            route = next.route; effort = next.effort;
+            record.provider = route.provider; record.model = route.model; record.effort = effort;
+            record.evidence = normalizeEvidence(next.qualification);
+            await save();
+            await run.dispose(); run = undefined;
+            index -= 1; // This round did not run; retry it on the next route.
+            continue;
+          }
+        }
         // A verdict is recorded exactly as declared. An unreadable one stays null so the
         // caller sees that none was given rather than a state nobody asserted.
         if (asking) {
@@ -175,7 +221,10 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
       // route rather than inventing one or reporting the round as unattributed.
       rounds: record.rounds.map(r => ({number: r.number, child_id: r.child_id, state: r.state,
         provider: r.provider ?? record.provider, model: r.model ?? record.model, effort: r.effort ?? record.effort,
-        route_recorded_per_round: r.model !== undefined})),
+        route_recorded_per_round: r.model !== undefined,
+        // Present only on a round that moved, so the record shows which provider refused
+        // and why, not merely that the run ended up somewhere else.
+        ...(r.failover_reason ? {failover_reason: r.failover_reason} : {})})),
       // The original request is returned with the result so a saved assignment can be
       // audited for what was asked, not only for what came back.
       prompt: record.prompt, allowed_tools: [...(record.allowed_tools ?? [])],
@@ -190,6 +239,7 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
       role: record.role ?? null, intent: record.intent ?? null,
       reviews: record.reviews ?? null, independence: record.independence ?? null,
       objective: record.objective ?? null, verdict: record.verdict ?? null,
+      failovers: record.failovers ?? [], standby_available: record.standby_available ?? 0,
       verdict_source: record.verdict_source ?? null,
       approval_required: false, automatic_retry: false, continuation_safe: record.continuation_safe, continuation_uses_new_child: true};
   }

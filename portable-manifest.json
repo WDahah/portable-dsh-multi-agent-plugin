@@ -31,7 +31,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "4ebdf07b161d8afde69c1e840ec5773fa7fadc1fa27426ecbba0dc75753d124b"
+      "sha256": "d8aa3d04c13428b734bd64e5d87f63acab3b30457015df10ac1425cd56ae6596"
     },
     {
       "path": "CODE_OF_CONDUCT.md",
@@ -83,7 +83,7 @@
     },
     {
       "path": "docs/USAGE.md",
-      "sha256": "4af196ecd5d9d512bb36d7b6210678e4eab7732264d648ad565475245dbeae32"
+      "sha256": "8d638f876beed002efd7743c0c1476b18d4f717d2b2bf944c30fe658bc28a66d"
     },
     {
       "path": "examples/PROJECT-PROMPT.md",
@@ -99,7 +99,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "2c7f6f4042f50d627dbfd400cfc3d207b30bd33014da314e1774fcda698d5974"
+      "sha256": "dfb78636ed70392603dfc7488e0cf805befb3af57e065952d02c8a10cf82783c"
     },
     {
       "path": "scripts/doctor.mjs",
@@ -119,7 +119,7 @@
     },
     {
       "path": "src/agent-dispatch.mjs",
-      "sha256": "9145ae6b66b6e006e018db83d83585b34e3ee9b560ee1559eaacafae8bab89a0"
+      "sha256": "8da2871e4dd86b6f57bfc4a34a59fd1f7c4394d0b2224f3289dc7b0f864ab706"
     },
     {
       "path": "src/cancellation.mjs",
@@ -135,7 +135,7 @@
     },
     {
       "path": "src/plugin.mjs",
-      "sha256": "19fbfa68e15aa12b6a353814c6932de8a4cd4da523144ded0344cd9724bb34c3"
+      "sha256": "a821d0bf299edc5684476e0a835aec6c181e715a5bf49fbf2e8a660f7b179493"
     },
     {
       "path": "src/probes.mjs",
@@ -147,7 +147,7 @@
     },
     {
       "path": "src/routes.mjs",
-      "sha256": "3e788d216aaea251b761842580a1b98a807534f84bad675bf6a9001288456bb9"
+      "sha256": "14cfe84605d3fe6b84876abbf289a723a67995d58abfdff08fd0eae0e21f8cec"
     },
     {
       "path": "src/verdict.mjs",
@@ -172,6 +172,10 @@
     {
       "path": "tests/diagnostic.test.mjs",
       "sha256": "9e52eecdfcec6eb82b11be248e6a4fe7a0567e0ae3ae2c7f341c94edff5c4f3e"
+    },
+    {
+      "path": "tests/distribution.test.mjs",
+      "sha256": "24efc8f3a9917b65a8e93e10ca7053611815ba708cb1a92d1713efb9f10c41ed"
     },
     {
       "path": "tests/engine.test.mjs",
