@@ -42,6 +42,10 @@ export function verdictInstruction(criteria = []) {
     '  "findings": what must change, each {"severity":"blocker|major|minor|note","detail":"..."}.',
     '  "clarifications": questions you need answered. Do not guess at an unstated requirement — list it here.',
     '  "verified": acceptance criteria you actually confirmed.',
+    'Keep the fields consistent with each other: do not return "verified" alongside',
+    '"onObjective": false or a "blocker" finding, and do not return "needs-clarification"',
+    'without at least one question. A self-contradictory answer stops the loop rather than',
+    'being resolved for you, so say what you mean in the verdict field itself.',
     checks,
   ].join('\n');
 }
@@ -81,16 +85,43 @@ export function parseVerdict({structured, output} = {}) {
     ? candidate.findings.filter(f => f && SEVERITIES.includes(f.severity) && text(f.detail, 2000))
       .slice(0, 50).map(f => ({severity: f.severity, detail: f.detail.trim()}))
     : [];
+  const summary = candidate.summary.trim();
+  const clarifications = strings(candidate.clarifications, 1000, 25);
+  // A verdict can contradict itself: approving work while also reporting that it missed its
+  // objective, or that a blocker is still standing. Noticing that compares the reviewer's
+  // own fields against each other, which is structural rather than a judgement about the
+  // work, so the contradiction is recorded instead of being resolved or ignored.
+  //
+  // The check reads what the reviewer declared, not what survived normalization. A blocker
+  // past the array cap, or one whose detail was too long to keep, is still a blocker the
+  // reviewer raised: letting the cap decide would make a contradiction disappear precisely
+  // when the reviewer had the most to say.
+  const declaredFindings = Array.isArray(candidate.findings) ? candidate.findings : [];
+  const declaredBlocker = declaredFindings.some(finding => finding?.severity === 'blocker');
+  const declaredClarifications = Array.isArray(candidate.clarifications)
+    ? candidate.clarifications.some(entry => typeof entry === 'string' && entry.trim()) : false;
+  const contradictions = [];
+  if (candidate.verdict === 'verified' && candidate.onObjective === false) contradictions.push('VERIFIED_BUT_OFF_OBJECTIVE');
+  if (candidate.verdict === 'verified' && declaredBlocker) contradictions.push('VERIFIED_WITH_BLOCKER');
+  if (candidate.verdict === 'needs-clarification' && !declaredClarifications) contradictions.push('CLARIFICATION_WITHOUT_QUESTION');
   return {
     verdict: candidate.verdict,
     onObjective: candidate.onObjective,
-    summary: candidate.summary.trim().slice(0, 500),
+    summary: summary.slice(0, 500),
     findings,
-    clarifications: strings(candidate.clarifications, 1000, 25),
+    clarifications,
     verified: strings(candidate.verified, 500, 50),
     // Records how the verdict arrived, so a host-enforced one is distinguishable from a
     // model that merely happened to emit valid JSON.
     source: structured ? 'schema' : 'text',
+    // What the stored verdict no longer says exactly as the reviewer said it. The record is
+    // normalized, not verbatim, and a reader should not have to discover that by comparing
+    // against something they no longer have.
+    normalized: [
+      ...(summary.length > 500 ? ['SUMMARY_TRUNCATED'] : []),
+      ...(declaredFindings.length > findings.length ? [`FINDINGS_DROPPED:${declaredFindings.length - findings.length}`] : []),
+    ],
+    contradictions,
   };
 }
 /** Tolerate a fenced or prose-wrapped object without accepting prose as a verdict. */
@@ -139,8 +170,19 @@ export function parseCompaction({structured, output, originalChars} = {}) {
 }
 /** Decide only whether another cycle is permitted. This reads the declared state and the
  * caller's cap; it never re-judges the work itself. */
-export function loopDecision({verdict, cycle, maxCycles, canWrite}) {
+export function loopDecision({verdict, cycle, maxCycles, canWrite, reviewState}) {
   if (!verdict) return {continue: false, state: 'VERDICT_UNREADABLE', reason: 'The reviewer did not return a usable verdict, so no cycle is inferred.'};
+  // A verdict from a run that did not finish describes an unfinished review. Acting on it
+  // would treat a truncated opinion as a settled one.
+  if (reviewState !== undefined && reviewState !== 'COMPLETED') {
+    return {continue: false, state: 'REVIEW_DID_NOT_COMPLETE', reason: `The reviewer ended as ${reviewState}, so its verdict describes an unfinished review.`};
+  }
+  // A verdict that disagrees with itself is not a decision anybody can act on. Neither
+  // reading is inferred: the contradiction is reported and the loop stops.
+  if (verdict.contradictions?.length) {
+    return {continue: false, state: 'VERDICT_INCOHERENT', contradictions: [...verdict.contradictions],
+      reason: `The reviewer's own fields disagree (${verdict.contradictions.join(', ')}), so neither outcome is assumed.`};
+  }
   if (verdict.verdict === 'verified') return {continue: false, state: 'VERIFIED', reason: 'The reviewer verified the work.'};
   if (verdict.verdict === 'needs-clarification') return {continue: false, state: 'NEEDS_CLARIFICATION', reason: 'The reviewer needs information the task did not supply.'};
   if (cycle >= maxCycles) return {continue: false, state: 'UNCONVERGED', reason: `Reached the ${maxCycles}-cycle limit without a verified result.`};

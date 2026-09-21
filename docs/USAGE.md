@@ -79,7 +79,23 @@ Each cycle reviews with a different provider where one is qualified, then revise
 | `NEEDS_CLARIFICATION` | Returned to you; the task lacked information |
 | `UNCONVERGED` | Reached the cycle cap without a verified result — not "done" |
 | `VERDICT_UNREADABLE` | No usable verdict, so no state was inferred |
+| `VERDICT_INCOHERENT` | The reviewer's own fields disagree, so neither outcome is assumed |
+| `REVIEW_DID_NOT_COMPLETE` | The reviewer's run did not finish, so its verdict describes an unfinished review |
 | `REVISION_INCOMPLETE` | A revision did not finish cleanly and was not handed on |
+
+### When a verdict disagrees with itself
+
+A reviewer can return `verified` while also reporting `onObjective: false`, or leaving a `blocker` finding standing, or ask for clarification without asking anything. That is not a decision anyone can act on, so the loop stops with `VERDICT_INCOHERENT` and lists the `contradictions` it found.
+
+Noticing this compares the reviewer's **own fields against each other**. It is not a judgement about the work, and neither reading is inferred: the plugin does not downgrade `verified` to `failed`, and does not accept it either.
+
+The check reads what the reviewer **declared**, not what survived storage limits. A blocker past the fifty-finding cap, or one whose detail was too long to keep, still counts — otherwise a contradiction would vanish precisely when a reviewer had the most to say.
+
+`verdictInstruction` states this contract to the reviewer, so the rule is something it can satisfy rather than trip blindly.
+
+### Verdicts are normalized, not verbatim
+
+`parseVerdict` trims the summary to 500 characters, caps findings at fifty, and drops entries that are malformed or too long. The stored verdict reports what that cost in `normalized`, for example `["SUMMARY_TRUNCATED", "FINDINGS_DROPPED:1"]`, so a reader is not left to discover it by comparing against something they no longer have.
 
 On `VERDICT_UNREADABLE` the cycle also reports `reviewState` and an `unreadableCause`, because a reviewer cut off by a token limit and one that answered in prose need opposite responses:
 
@@ -96,6 +112,8 @@ The cap is **3**, separate from and lower than the 8-round assignment limit, bec
 A reviewer that answers only through the structured channel still leaves a readable answer: the verdict is rendered as its saved text, so the record reads back and can itself be reviewed. The parsed verdict stays the authority.
 
 The `objective` travels to every child as fenced data, and the reviewer reports drift as `onObjective: false`. Drift is declared by the reviewer, never inferred by comparing text.
+
+**When you omit `objective`, the loop inherits the one the reviewed run recorded.** This matters more than it sounds: a reviser is deliberately not re-sent the original request, because the objective is supposed to carry it. Without either, a loop can satisfy its reviewer while quietly losing the task it started from. The result reports `objectiveSource` — `CALLER`, `INHERITED_FROM_SUBJECT`, or `NONE` — and when it is `NONE` the reviser is given the original request back instead.
 
 ## Compaction
 
