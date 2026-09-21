@@ -1,5 +1,6 @@
 import {createRecordStore, keyOf, need, normalizeEvidence, scopedSignal, visibleOutput} from './qualification.mjs';
 import {COMPACTION_SCHEMA, VERDICT_SCHEMA, compactionInstruction, normalizeObjective, objectiveMaterial, parseCompaction, parseVerdict, verdictInstruction} from './verdict.mjs';
+import {WORKER_RESULT_SCHEMA, parseWorkerResult, renderWorkerResult} from './worker-result.mjs';
 
 const READ_ONLY = new Set(['read', 'glob', 'grep', 'orchestrator_qualification_echo']);
 /** A provider that refused before the child began is the only case where trying another
@@ -59,9 +60,81 @@ export function renderVerdict(verdict) {
   if (verdict.clarifications.length) lines.push('', 'Needs clarification:', ...verdict.clarifications.map(c => `- ${c}`));
   return lines.join('\n');
 }
+/** Admission is reserved synchronously, including queued IDs and deletion. Active leases
+ * last through result handling and child disposal, not merely until cancellation. */
+function createAdmission(deadlineMs) {
+  const leases = new Map(), pending = [];
+  let active = 0, closed = false, deleting = false, deletionDone = Promise.resolve();
+  function drain() {
+    while (!closed && active < 2 && pending.length) {
+      const lease = pending.shift();
+      if (lease.scope.signal.aborted) {lease.cancel(); continue;}
+      lease.activate();
+    }
+  }
+  function reserve(key, signal, queue) {
+    need(!closed, 'OWNER_REFUSED'); signal.throwIfAborted();
+    need(!deleting && !leases.has(key), 'DELEGATION_BUSY');
+    const wait = active >= 2 || pending.length > 0;
+    need(!wait || queue, 'DELEGATION_BUSY');
+    need(!wait || pending.length < 8, 'DELEGATION_QUEUE_FULL');
+    const scope = scopedSignal(signal, deadlineMs), createdAt = Date.now();
+    let resolveReady, rejectReady, resolveDone, status = 'pending';
+    const ready = new Promise((resolve, reject) => {resolveReady = resolve; rejectReady = reject;});
+    const done = new Promise(resolve => {resolveDone = resolve;});
+    const lease = {scope, createdAt, deadlineAt: createdAt + deadlineMs, ready, done,
+      activate() {status = 'active'; active++; lease.admittedAt = Date.now(); resolveReady();},
+      cancel() {
+        if (status !== 'pending') return;
+        status = 'cancelled';
+        const index = pending.indexOf(lease); if (index >= 0) pending.splice(index, 1);
+        rejectReady(scope.signal.reason);
+      },
+      release() {
+        if (status === 'released') return;
+        if (status === 'active') active--;
+        status = 'released';
+        scope.signal.removeEventListener('abort', lease.cancel); scope.close();
+        leases.delete(key); resolveDone(); drain();
+      }};
+    leases.set(key, lease);
+    scope.signal.addEventListener('abort', lease.cancel, {once: true});
+    if (wait) pending.push(lease); else lease.activate();
+    return lease;
+  }
+  return {reserve,
+    reserveDeletion() {
+      need(!closed, 'OWNER_REFUSED');
+      need(!deleting && leases.size === 0, 'DELEGATION_BUSY'); deleting = true;
+      let finish; deletionDone = new Promise(resolve => {finish = resolve;});
+      return () => {deleting = false; finish();};
+    },
+    dispose() {
+      closed = true;
+      const current = [...leases.values()];
+      for (const lease of current) lease.scope.controller.abort(new DOMException('Bridge disposed', 'AbortError'));
+      return Promise.all([deletionDone, ...current.map(lease => lease.done)]).then(() => {});
+    }};
+}
+/** Cancellation starts teardown immediately, but ownership ends only after both the
+ * result and teardown settle. Disposal is memoized when abort races normal completion. */
+function ownChild(child, signal) {
+  const result = Promise.resolve(child.result); result.catch(() => {});
+  let disposal;
+  const begin = () => disposal ??= Promise.resolve().then(() => child.dispose());
+  const abort = () => {begin().catch(() => {});};
+  signal.addEventListener('abort', abort, {once: true});
+  if (signal.aborted) abort();
+  return {id: child.id, result, async dispose() {
+    try {
+      const [, settled] = await Promise.allSettled([result, begin()]);
+      if (settled.status === 'rejected') throw settled.reason;
+    } finally {signal.removeEventListener('abort', abort);}
+  }};
+}
 export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 900000}) {
   need(Number.isSafeInteger(deadlineMs) && deadlineMs > 0 && deadlineMs <= 900000, 'INVALID_DEADLINE');
-  const store = createRecordStore(root, owner, 'assignments'), busy = new Set(), controllers = new Set();
+  const store = createRecordStore(root, owner, 'assignments'), admission = createAdmission(deadlineMs);
   let disposed = false;
   const id = value => {need(typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value), 'INVALID_RUN_ID'); return keyOf(value);};
   /** Read the assignment a review is about. Refusing an unknown or unfinished subject
@@ -70,17 +143,20 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
     const saved = await store.read(id(runId)); need(saved, 'UNKNOWN_REVIEW_SUBJECT');
     const record = saved.data;
     need(record?.owner === owner && typeof record.visibleText === 'string', 'CORRUPT_ASSIGNMENT');
-    need(record.state !== 'PLANNED' && record.state !== 'RUNNING', 'REVIEW_SUBJECT_UNFINISHED');
+    need(!['PLANNED', 'STARTING', 'RUNNING'].includes(record.state), 'REVIEW_SUBJECT_UNFINISHED');
     need(record.visibleText.trim(), 'REVIEW_SUBJECT_EMPTY');
     return record;
   }
-  async function delegate(args, route, effort, exec) {
+  async function delegate(args, route, effort, exec, options = {}) {
     need(!disposed && exec.agent?.id === owner, 'OWNER_REFUSED'); exec.signal.throwIfAborted();
-    const key = id(args.run_id); need(!busy.has(key) && busy.size < 2, 'DELEGATION_BUSY'); busy.add(key);
-    let scope, run, record, revision = 0, persistenceFailed = false;
+    const key = id(args.run_id), lease = admission.reserve(key, exec.signal, options.queue === true), scope = lease.scope;
+    let run, record, revision = 0, persistenceFailed = false;
     async function save() {try {revision = await store.save(key, record, revision);} catch (error) {persistenceFailed = true; throw error;}}
     try {
+      await lease.ready; scope.signal.throwIfAborted();
       need(!(await store.read(key)), 'ASSIGNMENT_ALREADY_EXISTS');
+      need(!args.evidence || !Number.isSafeInteger(args.evidence.expiresAt) || args.evidence.expiresAt > Date.now(), 'EVIDENCE_EXPIRED');
+      need(options.resultFormat === undefined || options.resultFormat === 'findings', 'INVALID_RESULT_FORMAT');
       need(typeof args.prompt === 'string' && args.prompt.trim() && args.prompt.length <= 16000, 'INVALID_PROMPT');
       const tools = args.allowed_tools ?? ['read', 'glob', 'grep'];
       need(Array.isArray(tools) && tools.length > 0 && tools.length <= 7 && new Set(tools).size === tools.length && tools.every(t => KNOWN_TOOLS.has(t)), 'INVALID_TOOL_FILTER');
@@ -104,6 +180,8 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
       // an earlier run is not enough: a reviser also reads the work it revises, and must
       // return revised work rather than a judgement of it.
       const wantsVerdict = args.expect_verdict === true || (subject !== null && args.role === 'review');
+      const wantsFindings = options.resultFormat === 'findings';
+      need(!wantsFindings || !wantsVerdict, 'CONFLICTING_RESULT_FORMAT');
       // Qualified routes held in reserve, each with the evidence that authorized it.
       const standby = Array.isArray(args.alternates) ? [...args.alternates] : [];
       const safeContinuation = tools.every(tool => READ_ONLY.has(tool));
@@ -134,9 +212,9 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
         // which it is reading.
         routed_by: args.routing_provenance === 'CALLER_SUPPLIED' ? 'CALLER_SUPPLIED' : 'SELECTOR',
         selection_grounds: Array.isArray(args.grounds) ? [...args.grounds] : null,
-        createdAt: Date.now(), deadlineAt: Date.now() + deadlineMs};
+        ...(wantsFindings ? {worker_result: null, worker_result_reason: null} : {}),
+        createdAt: lease.createdAt, admittedAt: lease.admittedAt, deadlineAt: lease.deadlineAt, startedAt: null, finishedAt: null};
       await save();
-      scope = scopedSignal(exec.signal, deadlineMs); controllers.add(scope.controller);
       const subagents = getSubagents?.(); need(subagents, 'SUBAGENTS_UNAVAILABLE');
       for (let index = 0; index < maxRounds; index++) {
         scope.signal.throwIfAborted();
@@ -154,10 +232,13 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
         if (args.prompt.length + continuation.length + material.length + goal.length + verdictAsk.length > 160000) {record.state = 'PARTIAL_CONTEXT_LIMIT'; await save(); break;}
         // Each round carries the exact route that ran it, so attribution survives in the
         // journal and stays correct if a later version ever varies route across rounds.
-        record.state = 'RUNNING';
+        need(!record.evidence || record.evidence.expiresAt > Date.now(), 'EVIDENCE_EXPIRED');
+        record.state = 'RUNNING'; record.startedAt ??= Date.now();
         record.rounds.push({number: index + 1, child_id: null, state: 'STARTING', text: '',
           provider: route.provider, model: route.model, effort});
         await save();
+        scope.signal.throwIfAborted();
+        need(!record.evidence || record.evidence.expiresAt > Date.now(), 'EVIDENCE_EXPIRED');
         const round = record.rounds.at(-1);
         run = await subagents.start('spawn', {parent: exec.agent, signal: scope.signal,
           // The label is the only identity a session tree shows, so it names the exact
@@ -167,9 +248,10 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
           agentOptions: {provider: route.provider, model: route.model, reasoningEffort: effort, maxTokens},
           // The host validates the verdict shape when it can, so a usable verdict does not
           // depend on the model choosing to format JSON correctly.
-          ...(asking ? {outputSchema: VERDICT_SCHEMA} : {}),
+          ...(wantsFindings ? {outputSchema: WORKER_RESULT_SCHEMA} : asking ? {outputSchema: VERDICT_SCHEMA} : {}),
           maxDepth: 1, toolFilter: {allow: [...tools]},
           persona: 'Complete only the delegated task within its explicit scope. Do not delegate. Report partial work accurately. Change only what the task asks for: every change should trace to the request.'});
+        run = ownChild(run, scope.signal);
         round.child_id = run.id; round.state = 'RUNNING'; await save();
         const result = await run.result;
         let text = visibleOutput(result.output);
@@ -214,6 +296,11 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
             if (!text.trim()) text = renderVerdict(declared);
           }
         }
+        if (wantsFindings) {
+          record.worker_result = parseWorkerResult({structured: result.structured, output: text});
+          record.worker_result_reason = record.worker_result ? null : 'WORKER_RESULT_UNREADABLE';
+          if (!text.trim() && record.worker_result) text = renderWorkerResult(record.worker_result);
+        }
         need(record.visibleText.length + text.length <= 262144, 'AGGREGATE_OUTPUT_BOUND');
         const noProgress = index > 0 && (!text.trim() || record.visibleText.includes(text.trim()));
         round.text = text; round.state = result.stopReason;
@@ -225,21 +312,29 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
         if (!safeContinuation) {record.state = 'PARTIAL_NEEDS_RECONCILIATION'; await save(); break;}
         if (!text.trim() || index + 1 === maxRounds) break;
       }
+      record.finishedAt = Date.now(); await save();
       return page(record, 0);
     } catch (error) {
-      scope?.controller.abort();
-      if (record && !persistenceFailed) {record.state = 'INTERRUPTED_UNKNOWN'; try {await save();} catch {persistenceFailed = true;}}
+      scope.controller.abort();
+      if (record) {
+        record.state = 'INTERRUPTED_UNKNOWN'; record.finishedAt = Date.now();
+        record.failure_code = error?.code === 'EVIDENCE_EXPIRED' ? 'EVIDENCE_EXPIRED' : null;
+        const round = record.rounds.at(-1);
+        if (round && ['STARTING', 'RUNNING'].includes(round.state)) round.state = 'INTERRUPTED_UNKNOWN';
+        if (options.resultFormat === 'findings' && !record.worker_result) record.worker_result_reason = 'WORKER_RESULT_UNREADABLE';
+        if (!persistenceFailed) {try {await save();} catch {persistenceFailed = true;}}
+      }
       if (!record) throw error;
       return {...page(record, 0), state: persistenceFailed ? 'PERSISTENCE_FAILED' : record.state};
     } finally {
       if (run) {try {await run.dispose();} catch { /* Recorded uncertain result; no retry. */ }}
-      if (scope) {scope.close(); controllers.delete(scope.controller);}
-      busy.delete(key);
+      lease.release();
     }
   }
   function page(record, offset) {
     need(Number.isSafeInteger(offset) && offset >= 0 && offset <= record.visibleText.length, 'INVALID_OFFSET');
     return {run_id: record.run_id, state: record.state, provider: record.provider, model: record.model, effort: record.effort,
+      failure_code: record.failure_code ?? null,
       // Older assignments predate per-round route fields; fall back to the record-level
       // route rather than inventing one or reporting the round as unattributed.
       rounds: record.rounds.map(r => ({number: r.number, child_id: r.child_id, state: r.state,
@@ -265,6 +360,15 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
       failovers: record.failovers ?? [], standby_available: record.standby_available ?? 0,
       routed_by: record.routed_by ?? 'SELECTOR', selection_grounds: record.selection_grounds ?? null,
       verdict_source: record.verdict_source ?? null,
+      ...(Object.hasOwn(record, 'worker_result') ? {worker_result: record.worker_result,
+        worker_result_reason: record.worker_result_reason ?? null} : {}),
+      ...(record.role === 'compact' ? {compaction: record.compaction ?? null,
+        compaction_reason: record.compaction_reason ?? null} : {}),
+      created_at: record.createdAt ?? null, started_at: record.startedAt ?? null, finished_at: record.finishedAt ?? null,
+      queue_wait_ms: record.admittedAt == null ? null : Math.max(0, record.admittedAt - record.createdAt),
+      duration_ms: record.finishedAt == null ? null : Math.max(0, record.finishedAt - record.createdAt),
+      // STARTING is a persisted commitment; a failed start need not return a child ID.
+      child_attempts: record.rounds.length, returned_children: record.rounds.filter(round => round.child_id != null).length,
       approval_required: false, automatic_retry: false, continuation_safe: record.continuation_safe, continuation_uses_new_child: true};
   }
   async function read(runId, offset = 0) {
@@ -275,54 +379,82 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
   }
   /** Condense one finished run into working context for the next cycle. The compaction is
    * stored as its own assignment so the full text it replaces stays readable, and it is
-   * applied only when it is genuinely smaller. A failed compaction is not an error: the
-   * loop simply continues on the original, having spent one cheap call. */
+   * applied only when it is genuinely smaller. Refusals before a record exists are thrown;
+   * failures after record creation return applied:false and leave the original intact. */
   async function compact(args, route, effort, exec) {
-    need(!disposed && exec.agent?.id === owner, 'OWNER_REFUSED');
-    const subject = await loadSubject(args.subject);
-    const objective = normalizeObjective(args.objective);
-    const key = id(args.run_id); need(!(await store.read(key)), 'ASSIGNMENT_ALREADY_EXISTS');
-    const originalChars = subject.visibleText.length;
-    const scope = scopedSignal(exec.signal, deadlineMs); controllers.add(scope.controller);
-    let run;
+    need(!disposed && exec.agent?.id === owner, 'OWNER_REFUSED'); exec.signal.throwIfAborted();
+    const key = id(args.run_id), lease = admission.reserve(key, exec.signal, false), scope = lease.scope;
+    let run, record, originalChars = null, revision = 0, persistenceFailed = false;
+    async function save() {try {revision = await store.save(key, record, revision);} catch (error) {persistenceFailed = true; throw error;}}
+    const outcome = () => ({run_id: args.run_id, applied: record?.compaction != null && !persistenceFailed,
+      originalChars, compactedChars: persistenceFailed ? null : record?.compaction?.compactedChars ?? null,
+      reason: persistenceFailed ? 'COMPACTION_FAILED' : record?.compaction_reason ?? null});
     try {
-      const subagents = getSubagents?.(); need(subagents, 'SUBAGENTS_UNAVAILABLE');
-      run = await subagents.start('spawn', {parent: exec.agent, signal: scope.signal,
-        label: routeLabel('compact', route, effort, 1, args.run_id),
-        prompt: [{type: 'text', text: 'Condense the work below.' +
-          reviewMaterial(subject, {forRevision: true}) + compactionInstruction(objective?.statement)}],
-        agentOptions: {provider: route.provider, model: route.model, reasoningEffort: effort, maxTokens: args.max_tokens ?? 16384},
-        outputSchema: COMPACTION_SCHEMA, maxDepth: 1, toolFilter: {allow: []},
-        persona: 'Condense only. Omit nothing a reviser would need. Do not add commentary.'});
-      const result = await run.result;
-      scope.signal.throwIfAborted();
-      if (result.stopReason !== 'completed') return {run_id: args.run_id, applied: false, originalChars,
-        compactedChars: null, reason: 'COMPACTION_DID_NOT_COMPLETE'};
-      const text = visibleOutput(result.output);
-      const parsed = parseCompaction({structured: result.structured, output: text, originalChars});
-      const visibleText = parsed
-        ? parsed.summary + (parsed.retained.length ? '\n\nRetained verbatim:\n' + parsed.retained.map(r => `- ${r}`).join('\n') : '')
-        : '';
-      const record = {schemaVersion: 1, run_id: args.run_id, owner, provider: route.provider, model: route.model, effort,
+      await lease.ready; scope.signal.throwIfAborted();
+      need(!(await store.read(key)), 'ASSIGNMENT_ALREADY_EXISTS');
+      need(!args.evidence || !Number.isSafeInteger(args.evidence.expiresAt) || args.evidence.expiresAt > Date.now(), 'EVIDENCE_EXPIRED');
+      const subject = await loadSubject(args.subject), objective = normalizeObjective(args.objective);
+      need(args.objective === undefined || objective, 'INVALID_OBJECTIVE');
+      need(route && typeof route.provider === 'string' && typeof route.model === 'string' && typeof effort === 'string', 'INVALID_ROUTE');
+      const maxTokens = args.max_tokens ?? 16384;
+      need(Number.isInteger(maxTokens) && maxTokens >= 1024 && maxTokens <= 65536, 'INVALID_TECHNICAL_LIMIT');
+      originalChars = subject.visibleText.length;
+      record = {schemaVersion: 1, run_id: args.run_id, owner, provider: route.provider, model: route.model, effort,
         prompt: `Compaction of ${subject.run_id}`, original_prompt: subject.original_prompt ?? subject.prompt,
-        allowed_tools: [], max_rounds: 1, max_tokens: args.max_tokens ?? 16384,
-        state: parsed ? 'COMPLETED' : 'PARTIAL_NO_PROGRESS', rounds: [], visibleText,
+        allowed_tools: [], max_rounds: 1, max_tokens: maxTokens,
+        state: 'PLANNED', rounds: [], visibleText: '',
         cost_unknown: true, soft_target_usd: 1, hard_budget_cap: false, approval_required: false,
         automatic_retry: false, continuation_safe: true, evidence: normalizeEvidence(args.evidence),
         role: 'compact', intent: `compaction of ${subject.run_id}`, reviews: subject.run_id,
         independence: null, objective, verdict: null, verdict_source: null,
-        compaction: parsed ? {originalChars, compactedChars: parsed.compactedChars} : null,
-        createdAt: Date.now(), deadlineAt: Date.now() + deadlineMs};
-      if (parsed) await store.save(key, record, 0);
-      return {run_id: args.run_id, applied: !!parsed, originalChars,
-        compactedChars: parsed?.compactedChars ?? null,
-        reason: parsed ? null : 'COMPACTION_NOT_SMALLER_OR_UNREADABLE'};
+        compaction: null, compaction_reason: null,
+        createdAt: lease.createdAt, admittedAt: lease.admittedAt, deadlineAt: lease.deadlineAt, startedAt: null, finishedAt: null};
+      await save();
+      const subagents = getSubagents?.(); need(subagents, 'SUBAGENTS_UNAVAILABLE');
+      scope.signal.throwIfAborted();
+      need(!record.evidence || record.evidence.expiresAt > Date.now(), 'EVIDENCE_EXPIRED');
+      record.state = 'STARTING'; record.startedAt = Date.now();
+      const round = {number: 1, child_id: null, state: 'STARTING', text: '', provider: route.provider, model: route.model, effort};
+      record.rounds.push(round); await save();
+      scope.signal.throwIfAborted();
+      need(!record.evidence || record.evidence.expiresAt > Date.now(), 'EVIDENCE_EXPIRED');
+      run = await subagents.start('spawn', {parent: exec.agent, signal: scope.signal,
+        label: routeLabel('compact', route, effort, 1, args.run_id),
+        prompt: [{type: 'text', text: 'Condense the work below.' +
+          reviewMaterial(subject, {forRevision: true}) + compactionInstruction(objective?.statement)}],
+        agentOptions: {provider: route.provider, model: route.model, reasoningEffort: effort, maxTokens},
+        outputSchema: COMPACTION_SCHEMA, maxDepth: 1, toolFilter: {allow: []},
+        persona: 'Condense only. Omit nothing a reviser would need. Do not add commentary.'});
+      run = ownChild(run, scope.signal);
+      round.child_id = run.id; round.state = 'RUNNING'; record.state = 'RUNNING'; await save();
+      const result = await run.result, text = visibleOutput(result.output);
+      round.state = result.stopReason; round.text = text; record.visibleText = text;
+      const parsed = !scope.signal.aborted && result.stopReason === 'completed'
+        ? parseCompaction({structured: result.structured, output: text, originalChars}) : null;
+      if (parsed) {
+        record.visibleText = parsed.summary + (parsed.retained.length ? '\n\nRetained verbatim:\n' + parsed.retained.map(r => `- ${r}`).join('\n') : '');
+        record.compaction = {originalChars, compactedChars: parsed.compactedChars};
+      }
+      record.state = scope.signal.aborted ? 'INTERRUPTED_UNKNOWN' : result.stopReason !== 'completed'
+        ? (result.stopReason === 'max-tokens' ? 'PARTIAL' : 'INTERRUPTED_UNKNOWN') : parsed ? 'COMPLETED' : 'PARTIAL_NO_PROGRESS';
+      record.compaction_reason = scope.signal.aborted ? 'COMPACTION_FAILED' : result.stopReason !== 'completed'
+        ? 'COMPACTION_DID_NOT_COMPLETE' : parsed ? null : 'COMPACTION_NOT_SMALLER_OR_UNREADABLE';
+      record.finishedAt = Date.now(); await save();
+      await run.dispose(); run = undefined;
+      return outcome();
     } catch (error) {
-      // A compaction that fails costs one cheap call; the caller keeps the original.
-      return {run_id: args.run_id, applied: false, originalChars, compactedChars: null, reason: 'COMPACTION_FAILED'};
+      scope.controller.abort();
+      if (!record) throw error;
+      record.failure_code = error?.code === 'EVIDENCE_EXPIRED' ? 'EVIDENCE_EXPIRED' : null;
+      record.state = 'INTERRUPTED_UNKNOWN'; record.compaction = null;
+      record.compaction_reason = record.failure_code ?? 'COMPACTION_FAILED'; record.finishedAt = Date.now();
+      const round = record.rounds.at(-1);
+      if (round && ['STARTING', 'RUNNING'].includes(round.state)) round.state = 'INTERRUPTED_UNKNOWN';
+      if (!persistenceFailed) {try {await save();} catch {persistenceFailed = true;}}
+      return outcome();
     } finally {
-      if (run) {try {await run.dispose();} catch { /* Nothing was applied. */ }}
-      scope.close(); controllers.delete(scope.controller);
+      if (run) {try {await run.dispose();} catch { /* Failed compaction remains unapplied. */ }}
+      lease.release();
     }
   }
   /** Summaries only: enough to find a run again without replaying its saved output. */
@@ -346,19 +478,20 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
    * that no longer exists weakens the audit trail. Cascading would destroy the review,
    * and clearing the link would erase what it judged. */
   async function forget(runId, {force = false} = {}) {
-    const key = id(runId);
-    need(!busy.has(key), 'DELEGATION_BUSY');
-    const saved = await store.read(key); need(saved, 'UNKNOWN_ASSIGNMENT');
-    need(saved.data?.owner === owner, 'OWNER_REFUSED');
-    if (!force) {
-      const referees = (await store.entries())
-        .map(entry => entry.data)
-        .filter(record => record?.owner === owner && (record.reviews === runId || record.context_run === runId))
-        .map(record => record.run_id);
-      need(referees.length === 0, 'ASSIGNMENT_REFERENCED_BY_REVIEW');
-    }
-    await store.remove(key);
-    return {run_id: runId, removed: true, forced: force === true};
+    const key = id(runId), release = admission.reserveDeletion();
+    try {
+      const saved = await store.read(key); need(saved, 'UNKNOWN_ASSIGNMENT');
+      need(saved.data?.owner === owner, 'OWNER_REFUSED');
+      if (!force) {
+        const referees = (await store.entries())
+          .map(entry => entry.data)
+          .filter(record => record?.owner === owner && (record.reviews === runId || record.context_run === runId))
+          .map(record => record.run_id);
+        need(referees.length === 0, 'ASSIGNMENT_REFERENCED_BY_REVIEW');
+      }
+      await store.remove(key);
+      return {run_id: runId, removed: true, forced: force === true};
+    } finally {release();}
   }
   /** Which saved reviews point at this run. Reported so a refusal names what blocks it. */
   async function referencedBy(runId) {
@@ -366,5 +499,5 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
       .filter(record => record?.owner === owner && (record.reviews === runId || record.context_run === runId))
       .map(record => record.run_id);
   }
-  return {delegate, compact, read, list, forget, referencedBy, dispose() {disposed = true; for (const c of controllers) c.abort(new DOMException('Bridge disposed', 'AbortError'));}};
+  return {delegate, compact, read, list, forget, referencedBy, dispose() {disposed = true; return admission.dispose();}};
 }

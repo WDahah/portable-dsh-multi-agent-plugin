@@ -118,7 +118,7 @@ We rejected several other agents on the same grounds: a separate critic, a plann
 
 We projected a three-cycle loop would fall from ~19,500 to ~7,000 input tokens. **That was wrong, and worth recording why:** the baseline counted three model calls, but a review-and-revise loop is five or six — each cycle is a review *plus* a revision. We counted cycles and called them calls.
 
-Measured against the same five-call loop with and without the mechanisms:
+The historical comparison reported the following for the same five-call loop with and without the mechanisms. It predates the restored original-request handoff and is not a current total-token benchmark:
 
 | | Input tokens |
 |---|---|
@@ -148,7 +148,7 @@ Rejecting things is most of the design:
 - **A framework.** This is a plugin for one host. Portability claims we could not test would be worse than the limitation.
 - **Spec Kit's artifact pipeline.** `spec.md`, `plan.md`, `tasks.md` are a document-generating methodology; this is a routing and evidence layer. Adopting them would contradict the token goal, since every artifact gets re-read.
 - **Constitutional articles about how to build software.** Library-first, test-first, and similar are opinions about *your* code. A router should not impose an architecture on work it routes.
-- **Parallel models on one task.** One delegation is one scoped child. A review is a separate recorded run, not a second opinion fetched concurrently.
+- **Competing models on one task.** Batches now overlap independent read-only tasks, with two workers and caller-supplied scopes. They do not create a committee, a planner model or an automatic synthesis step. A review remains a separate recorded run.
 - **A budget cap.** The soft target is a target. Most routes report token counts rather than a price, and unknown cost never means free — so calling it a cap would be a lie with financial consequences.
 
 ## The through-line

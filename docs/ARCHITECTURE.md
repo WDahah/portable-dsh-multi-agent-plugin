@@ -10,7 +10,7 @@ This package is a **native DSH/Cordis plugin**, not an independent agent service
 
 The portable source uses Node built-ins. Its plugin factory receives the real host's `defineTool`; it does not bundle or replace DSH. Setup generates `.local/entry.mjs` bound to the destination's actual tools module and a candidate `.local/host-patch.yml`. Neither is a transferable proof of compatibility. The user-owned host composition must load the generated entry.
 
-The development reference was `dsh-tools`0.1.5-rc.2/Cordis^4.0.2; tests were run in a Node26.8.2 environment. Node>=22 is the package requirement, not a claim that every supported OS/Node/host combination was exercised. Use offline tests and doctor, then actual runtime acceptance on the destination.
+The development reference was `dsh-tools` 0.1.5-rc.2/Cordis ^4.0.2; the v1.14.0 local tests ran on Windows with Node 26.9.0. Node >=22 is the package requirement, not a claim that every supported OS/Node/host combination was exercised. Use offline tests and doctor, then actual runtime acceptance on the destination.
 
 ## Execution paths
 
@@ -30,7 +30,9 @@ The qualifier creates one bounded native child with only the active echo challen
 
 Owner identity comes from the host execution context, never a tool-supplied owner ID. Child assignment IDs and direct task IDs are immutable within their stores. Use a fresh absolute state directory on a new machine; do not copy another installation's accounts or qualification/task history.
 
-Direct tasks journal the original request, route, bounded round outputs, terminal state, usage and accounting. An attempt commitment precedes dispatch. Clean settled token-limit stops can lead to another attempt; recovered in-flight or uncertain work cannot silently dispatch again. Native assignments similarly record startup/result stages but do not offer uncertain-assignment replay or durable same-child resume.
+Direct tasks journal the original request, route, bounded round outputs, terminal state, usage and accounting. An attempt commitment precedes dispatch. Clean settled token-limit stops can lead to another attempt; recovered in-flight or uncertain work cannot silently dispatch again. Native assignments, including compactions, record startup/result stages but do not offer uncertain-assignment replay or durable same-child resume.
+
+Read-only batches persist their brief, independent task scopes, generated assignment IDs and collected bounded findings in an owner-scoped `batches` namespace. Two worker loops consume tasks in order; result order stays stable despite completion order. They share the dispatcher's two slots, with no extra model calls for planning, scheduling or synthesis. Batch recovery reports unfinished records as uncertain rather than dispatching again. Native usage stays explicitly unavailable; round commitments, returned child IDs and model calls are different quantities.
 
 Storage uses immutable numbered revisions, validation/checksums and file synchronization. This supports ordinary process-restart recovery under a single trusted coordinator. It is not encrypted/authenticated storage, distributed exactly-once execution, or a power-loss durability guarantee. Direct diagnostic leaves are process-local and may disappear after restart; they do not add hidden reasoning to the journal.
 

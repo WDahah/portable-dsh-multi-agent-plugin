@@ -6,31 +6,75 @@
 [![Node.js](https://img.shields.io/badge/node-%E2%89%A522-brightgreen)](package.json)
 [![Dependencies](https://img.shields.io/badge/dependencies-none-brightgreen)](package.json)
 
-**One model writes the work. A different one reviews it. Neither of them decides whether it passed.**
+**Route tasks, run scoped agents, collect parallel findings, and record structured reviews—with explicit limits and durable history.**
 
-This is a native plugin for a compatible DeepSeek Harness (DSH)/Cordis host — not a standalone agent framework. It routes each task to a model that has actually been tested for it, runs the work in a scoped child agent, and keeps a durable record of what was asked, which model answered, and what authorized the run.
+This is a native plugin for a compatible **DeepSeek Harness (DSH)/Cordis host**, not a standalone framework or hosted service. It selects routes from fresh session-scoped smoke evidence, runs bounded work, and records prompts, results, model identity and failure states. A reviewer declares whether work passed; the plugin follows that declaration, not its own judgment of the answer.
 
-## The problem it solves
+**Multi-agent does not automatically save tokens.** In the [27-trial benchmark](docs/BENCHMARK.md), parallel workers plus integration consumed **92.2% more tokens than one agent**. They were **23.5% faster than the same workers run sequentially**, but slower than one agent. Use delegation for useful separation of work—not an assumed token discount.
 
-You pay for several AI subscriptions. Every task goes to whichever model you happened to type, work comes back with no record of who did it or why you should believe it, and when you ask a model to check its own output it approves it — because a model reviewing itself has its own blind spots.
+## Contents
 
-This turns that into something with rules:
+- [Features](#features)
+- [Does it save tokens?](#does-it-save-tokens)
+- [Try it without a host](#try-it-without-a-host)
+- [Requirements and installation](#requirements-and-installation)
+- [First tasks](#first-tasks)
+- [The fifteen tools](#the-fifteen-tools)
+- [Routing and qualification](#routing-and-qualification)
+- [Limits and safety](#limits-and-safety)
+- [Validation and development](#validation-and-development)
+- [Documentation](#documentation)
 
-- **Tasks go where they fit.** A routine task does not reach your most expensive model because you called it complex.
-- **Reviews go somewhere else.** A review prefers a different provider than the work it judges, and says so when it cannot.
-- **Nothing passes by assumption.** A model must pass a probe in your session before it can be selected, a reviewer must *declare* a verdict, and a loop that runs out of attempts reports `UNCONVERGED` rather than "done".
+## Features
 
-### Is it for you?
+| Feature | What it does | Important limit |
+|---|---|---|
+| **Task-based routing** | Uses role, risk, complexity, data class and requested capabilities to select a qualified route; reports selection grounds | Deterministic policy, not a quality predictor or cheapest-price optimizer |
+| **Live qualification** | Probes one exact provider/model/effort for text and native tool round-trip; optional image/structured-output probes and operator attestations | A bounded smoke test does not certify competence on your task |
+| **Scoped delegation** | Runs a native child with an explicit prompt and tool allowlist; records its model and output per round | Prompt scopes are not path-level sandbox enforcement |
+| **Read-only parallel batches** | Accepts 2–8 independent tasks, runs up to two workers, and collects bounded findings in request order | Caller supplies scopes; no automatic decomposition, dependency graph, synthesis or semantic verification |
+| **Provider-diverse review** | Prefers a reviewer from another provider and records whether that preference was satisfied, including after failover | Different provider does not prove independent reasoning or correctness |
+| **Bounded review/revise loops** | Follows structured verdicts for up to three cycles; stops on clarification, incoherence, unreadable output or the cap | `VERIFIED` is the reviewer's declaration, not an independent test result |
+| **Durable records** | Stores assignment, batch, qualification and direct-task state; supports read/list/delete without model dispatch | Plaintext local state; single-process coordination, not distributed locking |
+| **Conservative continuation** | Can continue clean token-limit stops for eligible read-only work; does not automatically repeat write-capable work | Continuation creates another child and spends more tokens; uncertain work is not replayed |
+| **Opt-in distribution and failover** | Deterministically rotates eligible routes; can try an alternate after a recognized pre-dispatch refusal for read-only work | Not live load balancing, provider quota scheduling or general error retry |
+| **Separate accounting signals** | Direct tasks expose available per-round usage and missing-usage counts; native assignments expose commitments, returned children and timing | Native child results do not expose cumulative token usage to this plugin |
 
-**Yes, if** you use two or more model providers, want an audit trail of which model did what and on what authority, and would rather a task refuse than quietly run on something unverified.
+### Parallel batches in v1.14.0
 
-**No, if** you need a hosted product, a standalone framework, or a hard spending cap. It requires a running DSH/Cordis host; it is not `npm install`-able on its own.
+Batch workers share **two native execution slots** with ordinary delegations and compactions. Remaining batch work can wait in an internal FIFO queue of at most **eight pending reservations**. Ordinary delegate/compact calls refuse when busy; there is at most one active batch per owner.
 
-**Not sure?** Run the demo below. It works without any of that.
+Workers use only `read`, `glob` and `grep`, with one delegated round each. They return a short summary, at most five findings with evidence, and up to three uncertainties. A delegated round may contain several model/tool steps. Batch workers have no automatic continuation, failover or compaction. **The batch does not include an integration call**; add one explicitly if you need a combined answer and count its cost.
 
-## Try the routing logic without installing anything
+Slots stay occupied until child results and disposal settle, even after cancellation. Saved batch IDs cannot be replayed; unfinished recovered batches report `INTERRUPTED_UNKNOWN`. [Full batch behavior and limits →](docs/USAGE.md#parallel-read-only-batches)
 
-The parts that decide *which model runs what, and whether a result can be trusted* have no host calls and no dependencies. You can watch them work in about ten seconds:
+## Does it save tokens?
+
+**Not in the measured workloads below.** Keeping file contents in child sessions can reduce the main conversation's context, but those children still consume tokens. Repeated instructions, separate contexts, reviews and integration can cost more than one agent doing the work.
+
+The benchmark used three bounded repository-inspection workloads, three repetitions, and the same Codex `gpt-5.6-luna` model at medium effort for all approaches. Both multi-agent approaches include a final integration call.
+
+| Approach | Accepted | Mean tokens per trial | Tokens per accepted result¹ | Mean elapsed time |
+|---|---:|---:|---:|---:|
+| Single agent | 6/9 | **17,729** | **26,594** | **18.0 s** |
+| Sequential workers + integration | 9/9 | 34,404 | 34,404 | 38.2 s |
+| Parallel workers + integration | 8/9 | 34,076 | 38,335 | 29.2 s |
+
+¹ All tokens consumed, including failed answers, divided by accepted results. This is not an estimate of retry cost.
+
+- Usage was captured for **108/108 observed model calls** across **63 native child sessions**, using temporary host telemetry outside the shipped plugin's accounting interface.
+- Parallel used **44.2% more tokens per accepted result** than single-agent execution, with only a **1.0% aggregate token difference** versus sequential workers.
+- Three single-agent answers omitted half the questions. One parallel answer was factually correct but returned five findings instead of the required four. All costs remain included.
+- Setup, qualification, pilots, outer conversation and external acceptance scoring are excluded. These are bounded task-execution totals, **not the entire experiment's token bill**. Dollar cost is unknown.
+- Scoring was not blind, cache/provider load was uncontrolled, and there were only three repetitions per workload. The benchmark used the pre-review-fix v1.14.0 working snapshot, not an old/new release A/B test; it has not been rerun on the final fixes.
+
+**Recommendation:** use one agent by default for small inspections. Choose parallel specialists when independent scopes or latency relative to sequential specialists justify the overhead. These measurements do not establish a general token-saving claim or predict larger tasks.
+
+[Methodology, totals and limitations](docs/BENCHMARK.md) · [All 27 trial measurements (CSV)](docs/benchmarks/native-readonly-trials.csv)
+
+## Try it without a host
+
+With Node.js 22 or newer and Git installed:
 
 ```sh
 git clone https://github.com/WDahah/portable-dsh-multi-agent-plugin
@@ -38,274 +82,166 @@ cd portable-dsh-multi-agent-plugin
 node demo.mjs
 ```
 
-Three separate lines, because `&&` is a parse error in Windows PowerShell — still the default shell on Windows — and a first command that fails is a poor introduction.
+The demo runs the project's real routing and verdict parsing logic with **synthetic qualification evidence**. It makes no provider calls and does not prove that any route is available or that an answer is correct. It demonstrates selection, refusals, expiry, provider-diversity preference and declared verdict handling.
 
-It runs the **same** `selectRoute` and `parseVerdict` the plugin uses in production — only the qualification evidence is synthetic — and shows real refusals, provider-diversity selection, and why prose is never accepted as a verdict. Pass a scene name (`routing`, `refusal`, `expiry`, `diversity`, `verdicts`, `objective`, `aliases`) to run one alone.
+You can run a single scene: `node demo.mjs routing`. Other scenes are `refusal`, `expiry`, `diversity`, `verdicts`, `objective` and `aliases`.
 
-If you want the reasoning rather than the code, [docs/DESIGN-NOTES.md](docs/DESIGN-NOTES.md) explains the decisions and what they cost — including a token estimate we got wrong, and why.
+## Requirements and installation
 
-## What it looks like
+For live work you need:
 
-A real run from this repository's own testing — GPT-5.6-Sol drafted a design proposal, Claude Opus reviewed it:
+- Node.js **22+** and a running compatible DSH/Cordis host.
+- Host APIs for native tools, LLM preparation/streaming and child agents.
+- The destination host's actual `dsh-tools/lib/index.js` module.
+- Provider adapters and accounts authenticated through the host's supported mechanisms.
 
-```
-cycle 1: reviewed by claude/claude-opus-5 (independent=true)
-         verdict=verified  via schema  onObjective=true  -> VERIFIED
-```
+This package uses Node built-ins and has no package dependencies; **`npm install` is not required here**. That does not remove the host requirement. Integration was developed against `dsh-tools` **0.1.5-rc.2** and Cordis **^4.0.2**, not every host version.
 
-The reviewer approved the work **and still raised three findings**, confirmed each acceptance criterion individually, and asked a clarifying question. The verdict arrived through a host-enforced schema, so it is a structured decision rather than prose someone has to interpret.
+1. Follow [START-HERE.md](START-HERE.md), or use the scoped prompt in [INSTALL-WITH-AI.md](INSTALL-WITH-AI.md).
+2. Verify the supplied manifest and run the offline tests.
+3. Generate and inspect the local entry and candidate host patch using your actual host module path.
+4. Back up and update the **active user-owned host composition** using its supported reload procedure. Never edit shipped presets or silently add colliding `orchestrator_*` registrations.
+5. Verify all fifteen tools are visible, then qualify needed routes in the **same root session** that will dispatch work.
 
-Then the plugin did what matters most: it **stored that verdict without judging it**. Deciding whether work is acceptable is not the orchestrator's job.
+Setup generates `.local/entry.mjs` and `.local/host-patch.yml`; it does not install DSH, activate the plugin or authenticate accounts. Doctor checks the local integration offline. The plugin defaults disabled until deliberately enabled in the host configuration.
 
-## Why use it
+The integrity manifest detects missing or changed listed files; it is **not an authenticity signature** and the verifier does not reject unlisted extras. A hash mismatch can mean a changed file, corruption or line-ending conversion. Investigate it; do not regenerate the manifest to conceal an unexpected mismatch or run a destructive reset on valuable local work.
 
-### 1. Keep large work out of your main conversation
+## First tasks
 
-A delegated child reads the files, and only its answer returns to you. Measured on this repository's own source:
+### Delegate one read-only inspection
 
-| | Size | Approximate tokens |
-|---|---|---|
-| Five source files the child read | 78,352 bytes | ~19,600 |
-| Answer returned to the caller | 987 chars | ~250 |
-
-That is roughly **79× less context consumed** in the calling conversation for one review. The saving grows with the amount of material inspected, because the answer stays small while the input does not.
-
-### 2. Send each task to a model that fits it
-
-Role, risk and complexity choose the pool; you do not name a model:
-
-```
-standard, low risk  ->  codex/gpt-5.6-terra   medium   (balanced)
-review,   low risk  ->  claude/claude-opus-5  high     (advanced)
-```
-
-Reaching the expensive tier takes **grounds that corroborate each other**, not one label. A task described as complex stays on balanced; complex *and* high-risk escalates, as does critical risk or a role that exists to demand a stronger model. Every selection reports the `grounds` behind its pool, so the choice is always explainable and an `escalate` flag remains the caller's own decision.
-
-Five roles — `standard`, `deep`, `review`, `vision`, `domain` — each naming routing you can observe. A free-text `intent` records what the task is *for* and appears in the child's label, without ever changing the model.
-
-### 3. Never guess whether a model can do the job
-
-A route is selectable only after passing a real probe in your session. When nothing qualifies, the refusal tells you exactly what to run next instead of failing vaguely:
-
-```json
-{"id": "codex-sol", "effort": "high", "reason": "MISSING_EXACT_QUALIFICATION",
- "requalify": {"route_id": "codex-sol", "effort": "high"}}
-```
-
-Image and structured-output support are established by **probes that can fail** — a generated colour image the model must describe correctly, or JSON that must parse against a nonce. Guessing, refusing, or answering in prose all fail.
-
-Specialist-domain competence and confidential data handling are **not** machine-testable, so they require a named operator attestation with a written basis. Nothing lets a model self-certify.
-
-### 4. Get an audit trail you can check
-
-Every saved run records what was asked, which model answered **per round**, and the evidence that authorized it:
-
-```json
-"model": "claude-opus-5", "effort": "high",
-"evidence": {"evidenceId": "e4d453889a91fb218c94eff6712c3adf",
-             "caseResults": ["text", "native-tool-roundtrip"],
-             "allowedDataClasses": ["public", "internal"], "attestedBy": null}
-```
-
-`evidenceId` is **derived from the evidence**, not assigned, so a link can be rechecked by recomputing it. Evidence is fixed at plan time and any later edit is refused (`EVIDENCE_MUTATED`), so a run cannot be made to look authorized after the fact.
-
-### 5. Never silently repeat side effects
-
-A read-only task may continue in a new child after a token limit. A task that can write files or run commands **stops instead** (`PARTIAL_NEEDS_RECONCILIATION`), because the earlier attempt may already have changed something. Cancelled, interrupted, or uncertain attempts are never replayed automatically.
-
-### 6. Review work with a model that did not write it
-
-A review that runs on the model it is judging shares that model's blind spots. When a run declares `reviews`, the orchestrator prefers a candidate from a **different provider**, and the reviewer is handed the subject's request and answer as fenced data it is explicitly told not to obey.
-
-When no other provider is qualified, the review still happens — and records `independence: false` with a reason, rather than passing as independent. The same applies if a review *fails over* onto the provider it was avoiding: independence is recomputed against the route that actually ran, and the failover entry keeps the before and after, so the claim can never outlive the fact.
-
-`orchestrator_iterate` turns that into a bounded loop: review, revise from the findings, review again, capped at 3 cycles. It advances only on a **declared verdict** and never on its own reading of the work:
-
-| Stop | Meaning |
-|---|---|
-| `VERIFIED` | The reviewer verified the work |
-| `NEEDS_CLARIFICATION` | Returned to you; the task lacked information |
-| `UNCONVERGED` | Hit the cap without a verified result — not "done" |
-| `VERDICT_UNREADABLE` | No usable verdict, so no state was inferred |
-
-That last one is the important one. During live testing a reviewer was truncated by a token limit and returned nothing; the loop **stopped and said so** instead of guessing that the work had passed.
-
-### 7. Spend fewer tokens than the obvious design
-
-A review-and-revise loop is 5–6 model calls, and a naive implementation re-sends the whole artifact to every one of them. Measured against that same loop without the mechanisms here — structured verdicts instead of prose, revisers fed findings rather than a re-sent request, early exit on `verified`:
-
-| | Input tokens |
-|---|---|
-| Without | ~23,100 |
-| **With** | **~9,300** — a 60% reduction |
-
-Optional compaction shaves more as artifacts grow: 9% at 3,000 characters, 16% at 12,000, 18% at 24,000.
-
-### 8. Use the subscriptions you are already paying for
-
-Pools are priority-ordered, so by default the first qualified route takes every task — reproducible, and easy to misread as load balancing. It never was. `orchestrator_capacity` now says so directly:
-
-```json
-{"selects": "codex/gpt-5.6-sol",
- "idle": ["claude/claude-opus-5", "kimi-coding/k3"],
- "spreadWouldUse": ["codex/gpt-5.6-sol", "claude/claude-opus-5", "kimi-coding/k3"]}
-```
-
-`spread: true` rotates across every qualified route — measured **100/0/0 → 33/33/34** — keyed by `run_id`, so the same request still resolves the same way. Distribution without giving up reproducibility.
-
-`failover: true` lets a run move to an idle route when a provider refuses. Deliberately narrow: the refusal must have arrived **before** the child produced anything, and the tool scope must be read-only. Anything else records why it stayed put rather than risking a repeated side effect.
-
-Neither is automatic, because a hidden rule deciding where your work went is worth less than a rule you can predict.
-
-## A first task
-
-Read-only, and the model is chosen for you:
+After activation and qualification, invoke `orchestrator_delegate` with arguments such as:
 
 ```json
 {
-  "task": {"role": "standard", "intent": "explain the auth flow",
-           "category": "code-inspection", "risk": "low",
-           "complexity": "routine", "escalate": false,
-           "dataClass": "internal", "capabilities": ["text", "tools"]},
+  "task": {
+    "role": "standard",
+    "intent": "explain the auth flow",
+    "category": "code-inspection",
+    "risk": "low",
+    "complexity": "routine",
+    "escalate": false,
+    "dataClass": "internal"
+  },
   "run_id": "auth-inspect-001",
-  "prompt": "INSPECT ONLY. Read src/auth in <project>. Explain the authentication flow and the smallest change to add password reset. Do not edit, run commands, or access network.",
+  "prompt": "Inspect src/auth only. Explain the authentication flow with file:line evidence. Do not edit files, run commands, or access the network.",
   "allowed_tools": ["read", "glob", "grep"],
-  "max_rounds": 3,
+  "max_rounds": 1,
   "max_tokens": 16384
 }
 ```
 
-Read the result back later with `orchestrator_delegate_read({"run_id": "auth-inspect-001"})`. Implementation work uses the same shape with `write`/`edit` added and an explicit file scope.
+These are **host tool arguments**, not a shell command. Replace the path with a real scope in your project. Read saved output with `orchestrator_delegate_read({"run_id":"auth-inspect-001"})`. Explicitly authorized implementation tasks can add `write`/`edit`; they do not get automatic new-child continuation after a token limit.
 
-## The thirteen tools
+### Inspect two independent scopes
+
+Invoke `orchestrator_batch` with a shared brief and independently scoped tasks:
+
+```json
+{
+  "batch_id": "inspect-001",
+  "brief": "Read-only inspection. Report bounded findings with file:line evidence, not edits.",
+  "tasks": [
+    {
+      "id": "dispatch",
+      "scope": "src/agent-dispatch.mjs",
+      "prompt": "Inspect admission and cancellation behavior only.",
+      "task": {"role":"standard","category":"code-inspection","risk":"low","complexity":"routine","escalate":false}
+    },
+    {
+      "id": "routing",
+      "scope": "src/routes.mjs",
+      "prompt": "Inspect route selection and evidence checks only.",
+      "task": {"role":"standard","category":"code-inspection","risk":"low","complexity":"routine","escalate":false}
+    }
+  ]
+}
+```
+
+`orchestrator_batch_read({"batch_id":"inspect-001"})` returns summaries; add `"details":true` for findings. `COMPLETED` means workers finished and declared complete—not that their findings were verified. [Argument limits and recovery →](docs/USAGE.md#parallel-read-only-batches)
+
+## The fifteen tools
 
 | Tool | Purpose |
 |---|---|
 | `orchestrator_inventory` | Configured routes and recorded evidence; no provider call |
-| `orchestrator_qualify` | Real probe for one exact route and effort, plus optional capability probes and an operator attestation |
-| `orchestrator_delegate` | Select a qualified route and run a scoped child agent |
-| `orchestrator_delegate_read` | Read saved assignment output without restarting it |
-| `orchestrator_plan` / `orchestrator_run` | Persist and run a direct model task with bounded continuation |
-| `orchestrator_read` | Saved output, route, prompt and accounting |
-| `orchestrator_resume` | Resume only a settled, safe state; never an uncertain replay |
-| `orchestrator_iterate` | Review a run and, while its verdict asks for more, run bounded revise cycles |
-| `orchestrator_capacity` | What can be dispatched now, per pool, and the probe that would fix anything unusable |
-| `orchestrator_list` | Find saved assignments, tasks and evidence; summaries only |
-| `orchestrator_forget` | Permanently delete a saved record or lapsed evidence |
-| `orchestrator_qualification_echo` | Internal probe helper; no filesystem or network access |
+| `orchestrator_qualify` | Exact route/effort smoke test, optional capability probes and operator attestation |
+| `orchestrator_qualification_echo` | Internal active-challenge helper |
+| `orchestrator_capacity` | Recorded route eligibility and suggested requalification; not real-time provider capacity |
+| `orchestrator_delegate` | Select a qualified route and run a scoped native child |
+| `orchestrator_delegate_read` | Read saved assignment output without dispatch |
+| `orchestrator_batch` | Collect bounded findings from 2–8 read-only tasks using two workers |
+| `orchestrator_batch_read` | Read saved batch summaries or detailed findings |
+| `orchestrator_iterate` | Bounded review/revise cycles driven by declared verdicts |
+| `orchestrator_plan` | Select and persist a direct-model task |
+| `orchestrator_run` | Execute a planned direct task with eligible bounded continuation |
+| `orchestrator_read` | Read direct-task output and available accounting |
+| `orchestrator_resume` | Resume only an engine-approved safe state, never uncertain work |
+| `orchestrator_list` | List assignments, batches, direct tasks or qualification evidence |
+| `orchestrator_forget` | Permanently delete eligible saved records; in-flight/reference checks apply |
 
-Full argument details are in [docs/USAGE.md](docs/USAGE.md).
+[Full tool reference →](docs/USAGE.md)
 
-## What it does not do
+## Routing and qualification
 
-Being clear about this matters more than the feature list, because every claim above is bounded by it.
+Roles are `standard`, `deep`, `review`, `vision` and `domain`. A free-text `intent` describes the task without changing routing. Ordinary work defaults to **balanced**. An advanced role or critical risk can justify **advanced** alone; otherwise escalation needs corroborating grounds. `escalate:true` requests **long-horizon**. An explicit `pool` overrides the default policy; **economy is not selected automatically** just because a task looks easy.
 
-- **It does not judge your work.** A verdict is the reviewer's declaration, normalized to storage bounds with truncation and dropped entries reported. The plugin reads the declared state to decide whether a cycle may continue; it never reads prose to decide whether work is good.
-- **It is not a budget cap.** `$1` is a soft target; requests can exceed it. Most routes report `costUnknown` with token counts instead of a price, and unknown cost never means free.
-- **It is not a security boundary.** It connects to real host services under your existing sandbox, permissions and approval policy.
-- **It does not certify competence.** A passed probe shows one route answered one bounded challenge. Specialist-domain and confidential work require a named human attestation precisely because no probe can establish them.
-- **It does not run several models in parallel on one task.** One delegation is one scoped child at a time; a review is a separate run, not a second opinion fetched concurrently.
-- **Agents do not talk to each other.** The host caps delegation at one level, and every hand-off is recorded through the parent as data. There is no side channel whose outcome escapes the journal.
+[Bundled routes](src/routes.mjs) are deployment-specific candidates, not universal availability promises:
 
-## How it was built
-
-Worth knowing before you trust any of the numbers above.
-
-This was written by an AI agent under human direction, and the figures come from measurements rather than estimates — including two that came back worse than predicted. A projected token saving was wrong because it counted cycles instead of model calls; the measured figure replaced it and the mistake is recorded in [the design notes](docs/DESIGN-NOTES.md). An early draft of the routing change sent routine work to the cheapest tier and was reverted before release when the tests showed it turned ordinary tasks into refusals.
-
-The quickstart above is three lines rather than one because a reader hit a parse error in Windows PowerShell running what the README told them to run. The escalation rule changed because a reader pointed out that qualifying more models did not give them work.
-
-The plugin has also been used on itself. Sending the codebase to a model from another provider for review produced eight real defects across two rounds — including a verdict that could approve work it had just called broken, and a review that could fail over onto the provider it was avoiding while still recording `independent: true`. That last one was a false claim in the project's headline feature, and neither 182 passing tests nor the author's own reading had found it.
-
-Those findings were fixed, but **the fixes were not trusted because a model proposed them**. Each defect was reproduced first, each fix checked against that reproduction, and the regression tests were run against the pre-fix commit to confirm they actually fail on the old code — seven of eight did. A review from one model and verification by another is the same discipline this plugin exists to support.
-
-That is the pattern worth judging the project by: claims here are measured, corrections are kept visible, and the bugs users actually hit — or that another model finds — are the ones that shaped it.
-
-## Start here
-
-**Just looking?** Run `node demo.mjs` — ten seconds, no install, no host.
-
-**Want the reasoning?** [docs/DESIGN-NOTES.md](docs/DESIGN-NOTES.md) is written to be useful even if you never install this.
-
-**Ready to use it?** [START-HERE.md](START-HERE.md), then qualify a route and send one read-only task.
-
-**Found something wrong?** [Open an issue](https://github.com/WDahah/portable-dsh-multi-agent-plugin/issues). Several releases exist because someone did.
-
-- [demo.mjs](demo.mjs): run the routing and verdict logic with no host — `node demo.mjs`.
-- [docs/DESIGN-NOTES.md](docs/DESIGN-NOTES.md): the decisions and what they cost, readable without installing anything.
-- [START-HERE.md](START-HERE.md): shortest installation path.
-- [INSTALL-WITH-AI.md](INSTALL-WITH-AI.md): complete copy-paste installation prompt.
-- [docs/USAGE.md](docs/USAGE.md): tool calls and task metadata.
-- [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md): host integration and persistence.
-- [docs/SECURITY-AND-LIMITS.md](docs/SECURITY-AND-LIMITS.md): read before enabling paid calls or project writes.
-- [CHANGELOG.md](CHANGELOG.md): released behavior changes.
-- [SECURITY.md](SECURITY.md): report security vulnerabilities privately.
-- [CONTRIBUTING.md](CONTRIBUTING.md): development checks and pull request guidance.
-- [examples/PROJECT-PROMPT.md](examples/PROJECT-PROMPT.md): scoped task prompt for any project.
-
-## Requirements
-
-- Node.js **22 or newer**.
-- An installed, running, compatible DSH/Cordis host with native tool registration, LLM preparation/streaming, and child-agent APIs.
-- The actual destination host's `dsh-tools/lib/index.js` module, not a path copied from another machine.
-- Provider adapters and accounts authenticated through the host's supported UI or official authentication flow.
-
-The source integration was developed against `dsh-tools` **0.1.5-rc.2** with Cordis **^4.0.2**. This is a compatibility reference, not a guarantee for every release. If DSH is missing, consult its current official installation documentation; this folder does not install DSH and does not invent a universal host-install command.
-
-## Offline preparation
-
-From this folder, after confirming the package and scripts are present:
-
-```sh
-node scripts/verify.mjs
-npm test
-node scripts/setup.mjs --tools-module "<actual-host-dsh-tools/lib/index.js>" --state-root "<absolute fresh state directory>"
-node scripts/doctor.mjs
-```
-
-The verifier checks listed file hashes in `portable-manifest.json` and detects missing/modified listed files. It is not an authenticity signature and does not reject unlisted extra files. Use a complete, finalized distribution with its manifest; do not fabricate a new manifest to conceal a failed check.
-
-Whether you clone or copy the folder, the files must keep their committed bytes. `.gitattributes` disables line-ending translation for exactly this reason. If verification reports many or all files as modified, the checkout rewrote line endings rather than the code being tampered with — re-clone it, or run `git rm -r --cached .` followed by `git reset --hard`, instead of regenerating the manifest.
-
-`--state-root` is optional; use it explicitly when isolating this installation. Supply exactly one of `--tools-module` or the alternative `--harness-root "<absolute installed host directory>"` discovery option, not both. The portable code uses Node built-ins; **`npm install` is not required for this package**. That does not remove the separate DSH host requirement.
-
-Setup generates only **`.local/entry.mjs` and `.local/host-patch.yml`**. It does not edit or activate a host profile. Doctor checks the local/generated integration offline; it can also accept the tools-module argument. Neither doctor nor `npm test` authenticates a provider, makes live qualification claims, or proves that the running host loaded the plugin.
-
-Back up the **active user-owned host patch**, inspect `.local/host-patch.yml`, and merge its root insertion without overwriting existing rows. Never edit shipped presets. Detect existing `orchestrator_*` registrations before activation: resolve a collision only through an explicitly identified, backed-up old plugin row and appropriate user authority. See the AI guide for the complete sequence.
-
-## What installation does — and does not — prove
-
-| Stage | Evidence |
-|---|---|
-| `npm test` passes | Offline synthetic behavior only |
-| Setup and doctor pass | Local entry/candidate patch and offline compatibility checks |
-| Host loads the entry | Native tool registration in that running host |
-| Fresh `orchestrator_qualify` passes | One exact route/effort's live probe in the calling owner session |
-| Routed task succeeds | End-to-end behavior for that task and scope |
-
-No credentials, authenticated accounts, previous state or transferable live qualifications are bundled. Previous-machine successes do not qualify this machine. Qualifications are **owner/root-session scoped**, expire after **24 hours**, and must be created in the same root agent session that dispatches work. A new project/session must establish its own evidence.
-
-## Routing policy
-
-The bundled candidate mapping in `src/routes.mjs` reflects one deployment, not universal provider availability:
-
-| Pool | Candidate order |
+| Pool | Candidate priority |
 |---|---|
 | economy | Luna, DeepSeek V4 Flash |
 | balanced | Terra, Sonnet, DeepSeek V4.1 Flash label |
 | advanced | Sol, Opus, K3 |
 | long-horizon | Fable, Astra, K3 |
-| vision | DeepSeek V4 vision (explicit choice only) |
+| vision | DeepSeek V4 vision, explicit pool choice |
 
-Routes in no pool are reported as `reserve: true`: held back deliberately, not broken. Only exact, current, qualified route/effort combinations can be selected, and a model is never silently aliased. If another host needs different identifiers, review the route definitions, pool priorities and effort expectations together, then qualify the new mappings. Synthetic test records are never live qualification evidence.
+Model labels/identifiers are those configured in the source, not pinned model versions. Your host must expose the exact provider/model/effort and pass fresh qualification. Route mappings may need a reviewed change on another host. No credentials or transferable qualifications are bundled.
 
-## Operating limits
+Qualification is owner/root-session scoped and expires after **24 hours**. Text/tool probes establish basic reachability; image and structured-output probes cover those specific capabilities. Domain competence and broader data-class permission require a named operator attestation. An attestation records a decision—it does not prove expertise or provider data handling.
 
-- **$1 is a soft estimated target, not a financial ceiling.** Requests can exceed it without a per-call budget approval. Normal host permissions and approval policies still apply; there is no security bypass.
-- Native/subscription costs may be **unknown**, not zero. Direct tasks report token usage where no price exists; delegated runs report why no token count is available.
-- Direct tasks can continue clean token-limit stops; uncertain interrupted attempts are not blindly retried. File-changing agents do not automatically repeat potentially completed side effects.
-- Raw concatenation of saved continuation rounds can omit a newline at a boundary. Saved content is not a guarantee of correctly formatted or semantically complete output.
-- Basic smoke evidence does not qualify the `vision` or `domain` roles; each needs its own probe or attestation.
-- At most two qualifications and two delegations run concurrently per owner; further calls are refused rather than queued.
+Priority order is the default. `spread:true` is deterministic rotation, not live load balancing or guaranteed equal distribution; reviewer-provider preference takes precedence. `failover:true` is opt-in and restricted to recognized pre-dispatch refusals without output in read-only assignments. A later successful call is never guaranteed by earlier qualification.
 
-Use a fresh state directory on the destination machine. Keep it private: prompts and visible outputs are stored in plaintext until you delete them with `orchestrator_forget`. Review the full security document before use.
+## Limits and safety
+
+- **No automatic correctness guarantee.** Structured output validates fields, not truth. The reviewer declares `verified`, `partial`, `failed` or `needs-clarification`. Contradictory verdicts stop the loop; they do not get silently resolved.
+- **No guaranteed token savings or hard spending cap.** Direct tasks report a soft $1 estimated target where pricing is available; native/subscription monetary cost can be unknown. Requested token limits and deadlines are not financial ceilings.
+- **No complete native usage ledger in the plugin.** Native assignments/batches report usage as unknown; child commitments and returned-child counts are not model-call counts. Direct tasks expose available usage and missing rounds. The published benchmark used separate temporary telemetry.
+- **Host policies still apply.** Tool allowlists restrict exposed tools, but prompt scopes are not an independent filesystem security boundary. This plugin does not bypass sandbox or approval controls.
+- **No automatic replay of uncertain work.** Read-only continuation after clean token limits is bounded; write-capable partial work needs reconciliation. Saved text can still be incomplete or incorrectly formatted.
+- **Small, owner-local concurrency.** At most two qualifications and two native delegate/compact assignments run per owner. Batch workers share the native slots and may queue internally; ordinary busy calls refuse. Direct-model tasks and qualifications do not share the native admission pool. This is not a provider-wide quota controller.
+- **No peer-agent protocol or shared-write coordination.** Children have delegation depth one; the plugin passes recorded results through the parent. Batches are read-only and cannot prove caller-supplied scopes are independent.
+- **Local durability has limits.** Journals coordinate one process, not several processes or machines. A batch-journal failure aborts siblings; an isolated assignment-journal failure leaves that task incomplete while others may continue. Review uncertain records before replacement work.
+- **Plaintext retention.** Prompts and visible outputs stay in the state directory until removed. Keep it private and use a fresh state directory on another installation. Deletion is permanent; it does not undo external side effects.
+
+[Read the security and limits guide before enabling paid calls or project writes.](docs/SECURITY-AND-LIMITS.md)
+
+## Validation and development
+
+For the v1.14.0 review-fix snapshot, the local Windows/Node 26.9.0 run passed **224 tests**, with no failures or skips. Focused regressions were first run against the pre-fix source to confirm the reported failures. An independent source review found no remaining blocking issue in that delta. These are not proof of correctness or a substitute for CI.
+
+CI is configured for **Linux, Windows and macOS on Node 22 and 24**. Check the CI badge or the specific commit's run; a configured matrix is not a claim that every leg has passed. The live benchmark is separate evidence from the offline suite and covers only its stated tasks and snapshot.
+
+From a complete checkout:
+
+```sh
+node scripts/manifest.mjs --check
+node scripts/verify.mjs
+npm test
+```
+
+Contributors who intentionally change packaged files must regenerate the manifest with `node scripts/manifest.mjs`, review the diff, and verify again. Keep `.local/`, credentials and state out of commits. See [CONTRIBUTING.md](CONTRIBUTING.md).
+
+## Documentation
+
+- [START-HERE.md](START-HERE.md) — shortest installation path.
+- [INSTALL-WITH-AI.md](INSTALL-WITH-AI.md) — scoped installation instructions for an assistant.
+- [Usage](docs/USAGE.md) — tool arguments, limits, review loops and recovery.
+- [Architecture](docs/ARCHITECTURE.md) — host integration and persistence.
+- [Security and limits](docs/SECURITY-AND-LIMITS.md) — permissions, spending and retained state.
+- [Benchmark](docs/BENCHMARK.md) — measured token/latency results and limitations.
+- [Design notes](docs/DESIGN-NOTES.md) — rationale and historical experiments, not current performance guarantees.
+- [Changelog](CHANGELOG.md) — versioned behavior changes.
+- [Example project prompt](examples/PROJECT-PROMPT.md) — a starting point for scoped work.
+- [Security reporting](SECURITY.md) · [Issues](https://github.com/WDahah/portable-dsh-multi-agent-plugin/issues)

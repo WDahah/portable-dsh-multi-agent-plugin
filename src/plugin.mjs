@@ -5,6 +5,7 @@ import {createTaskEngine} from './engine.mjs';
 import {createQualificationManager, need, BUILD_ID} from './qualification.mjs';
 import {createAgentDispatcher} from './agent-dispatch.mjs';
 import {loopDecision} from './verdict.mjs';
+import {createBatchRunner} from './batch.mjs';
 
 // Refusals the caller can act on. Anything outside this closed list reads as UNAVAILABLE,
 // so an unexpected failure can never leak a provider message, path or credential.
@@ -18,7 +19,9 @@ const REFUSAL_REASONS = new Set(['DISABLED', 'OWNER_REQUIRED', 'OWNER_CAPACITY',
   'PERSISTENCE_FAILED', 'INVALID_CHALLENGE', 'CHALLENGE_ALREADY_USED',
   'UNKNOWN_LIST_KIND', 'SPECIFY_EXACTLY_ONE_TARGET', 'QUALIFICATIONS_EXPIRED_OR_ALL',
   'INVALID_CYCLE_LIMIT', 'INVALID_OBJECTIVE', 'UNKNOWN_REVIEW_SUBJECT', 'REVIEW_SUBJECT_UNFINISHED',
-  'REVIEW_SUBJECT_EMPTY', 'CORRUPT_ASSIGNMENT', 'ASSIGNMENT_REFERENCED_BY_REVIEW']);
+  'REVIEW_SUBJECT_EMPTY', 'CORRUPT_ASSIGNMENT', 'ASSIGNMENT_REFERENCED_BY_REVIEW',
+  'INVALID_BATCH', 'DUPLICATE_BATCH_TASK', 'BATCH_BUSY', 'BATCH_ALREADY_EXISTS', 'UNKNOWN_BATCH',
+  'DELEGATION_QUEUE_FULL', 'EVIDENCE_EXPIRED', 'JOURNAL_BOUND', 'ASSIGNMENT_REFERENCED_BY_BATCH']);
 const refusalReason = error => typeof error?.code === 'string' && REFUSAL_REASONS.has(error.code) ? error.code : 'UNAVAILABLE';
 
 /** Inject the installed host's native defineTool; this package does not vendor DSH. */
@@ -30,14 +33,23 @@ export function createPlugin(defineTool) {
     need(typeof config.stateRoot === 'string' && path.isAbsolute(config.stateRoot), 'ABSOLUTE_STATE_ROOT_REQUIRED');
     const enabled = config.enabled ?? false; need(typeof enabled === 'boolean', 'BOOLEAN_ENABLED_REQUIRED');
     const owners = new Map(); let disposed = false;
-    ctx.effect(() => () => {disposed = true; for (const entry of owners.values()) {entry.qualifications.dispose(); entry.agents.dispose(); entry.engine.dispose();} owners.clear();});
+    ctx.effect(() => () => {
+      disposed = true; const draining = [];
+      for (const entry of owners.values()) {
+        draining.push(entry.batches.dispose()); entry.qualifications.dispose(); entry.engine.dispose();
+        draining.push(entry.agents.dispose());
+      }
+      owners.clear(); return Promise.allSettled(draining);
+    });
     function owned(exec) {
       need(!disposed && typeof exec.agent?.id === 'string' && exec.agent.id, 'OWNER_REQUIRED'); exec.signal.throwIfAborted();
       if (!owners.has(exec.agent.id)) {
         need(owners.size < 64, 'OWNER_CAPACITY');
         const options = {root: config.stateRoot, owner: exec.agent.id, getLlm: () => ctx.get('llm'),
           getSubagents: () => ctx.get('subagents'), getAttachments: () => ctx.get('attachments')};
-        owners.set(exec.agent.id, {qualifications: createQualificationManager(options), agents: createAgentDispatcher(options), engine: createTaskEngine(options)});
+        const qualifications = createQualificationManager(options), agents = createAgentDispatcher(options);
+        owners.set(exec.agent.id, {qualifications, agents, engine: createTaskEngine(options),
+          batches: createBatchRunner({...options, agents, qualifications})});
       }
       return owners.get(exec.agent.id);
     }
@@ -127,6 +139,13 @@ export function createPlugin(defineTool) {
       }, 910000);
     register('orchestrator_delegate_read', 'Read immutable child-assignment output; never restarts the child.',
       {run_id: {type: 'string', required: true}, offset: {type: 'integer'}}, (args, exec) => owned(exec).agents.read(args.run_id, args.offset ?? 0));
+    register('orchestrator_batch', 'Run 2–8 independent read-only tasks with at most two workers. Collect bounded findings without a synthesis call; native usage remains unknown. No retries, failover or writes.',
+      {batch_id: {type: 'string', required: true}, brief: {type: 'string', required: true},
+        tasks: {type: 'json', required: true}, max_tokens: {type: 'integer'}, deadline_ms: {type: 'integer'}, spread: {type: 'boolean'}},
+      (args, exec) => {need(enabled, 'DISABLED'); return owned(exec).batches.run(args, exec);}, 910000);
+    register('orchestrator_batch_read', 'Read saved batch status and summaries without dispatch. Include bounded findings only when details is true; recovered unfinished batches never replay.',
+      {batch_id: {type: 'string', required: true}, details: {type: 'boolean'}},
+      (args, exec) => owned(exec).batches.read(args.batch_id, args.details === true));
     register('orchestrator_iterate', 'Review a finished run and, while its declared verdict asks for more work, dispatch bounded revise cycles. The plugin records each verdict and never judges the work itself; an unreadable verdict stops the loop rather than inferring one.',
       {...task, run_id: {type: 'string', required: true}, reviews: {type: 'string', required: true},
         review_prompt: {type: 'string'}, revise_prompt: {type: 'string'},
@@ -288,9 +307,10 @@ export function createPlugin(defineTool) {
     register('orchestrator_list', 'List saved assignments, direct tasks and qualification evidence for this owner; summaries only, no stored output or provider call.',
       {kind: {type: 'string'}}, async (args, exec) => {
         const kind = args.kind ?? 'all';
-        need(['all', 'assignments', 'tasks', 'qualifications'].includes(kind), 'UNKNOWN_LIST_KIND');
+        need(['all', 'assignments', 'tasks', 'qualifications', 'batches'].includes(kind), 'UNKNOWN_LIST_KIND');
         const entry = owned(exec), now = Date.now(), result = {kind};
         if (kind === 'all' || kind === 'assignments') result.assignments = await entry.agents.list();
+        if (kind === 'all' || kind === 'batches') result.batches = await entry.batches.list();
         if (kind === 'all' || kind === 'tasks') result.tasks = await entry.engine.list();
         if (kind === 'all' || kind === 'qualifications') {
           result.qualifications = (await entry.qualifications.list()).map(record => ({
@@ -302,20 +322,24 @@ export function createPlugin(defineTool) {
         return result;
       });
     register('orchestrator_forget', 'Permanently delete saved records this owner no longer needs. Prompts and outputs are stored in plaintext, so removal is the only way to clear them. In-flight work is refused, never deleted beneath itself.',
-      {run_id: {type: 'string'}, task_id: {type: 'string'}, qualifications: {type: 'string'}, force: {type: 'boolean'}}, async (args, exec) => {
+      {run_id: {type: 'string'}, task_id: {type: 'string'}, batch_id: {type: 'string'}, qualifications: {type: 'string'}, force: {type: 'boolean'}}, async (args, exec) => {
         const entry = owned(exec), result = {};
-        const wanted = ['run_id', 'task_id', 'qualifications'].filter(key => args[key] !== undefined);
+        const wanted = ['run_id', 'task_id', 'batch_id', 'qualifications'].filter(key => args[key] !== undefined);
         need(wanted.length === 1, 'SPECIFY_EXACTLY_ONE_TARGET');
-        if (args.run_id !== undefined) {
-          // Name what blocks the deletion, so the refusal is actionable rather than opaque.
+        if (args.run_id !== undefined) return entry.batches.withAssignmentDeletion(async () => {
           if (args.force !== true) {
+            const batches = await entry.batches.referencedBy(args.run_id);
+            if (batches.length) return {status: 'BRIDGE_REFUSED_OR_FAILED', reason: 'ASSIGNMENT_REFERENCED_BY_BATCH',
+              referenced_by: batches, hint: 'Delete those batch records first, or pass force:true to accept dangling references.',
+              details_redacted: true, automatic_retry: false};
             const referees = await entry.agents.referencedBy(args.run_id);
             if (referees.length) return {status: 'BRIDGE_REFUSED_OR_FAILED', reason: 'ASSIGNMENT_REFERENCED_BY_REVIEW',
               referenced_by: referees, hint: 'Delete those reviews first, or pass force:true to accept a dangling reference.',
               details_redacted: true, automatic_retry: false};
           }
-          result.assignment = await entry.agents.forget(args.run_id, {force: args.force === true});
-        }
+          return {assignment: await entry.agents.forget(args.run_id, {force: args.force === true})};
+        });
+        if (args.batch_id !== undefined) result.batch = await entry.batches.forget(args.batch_id);
         if (args.task_id !== undefined) result.task = await entry.engine.forget(args.task_id);
         if (args.qualifications !== undefined) {
           need(['expired', 'all'].includes(args.qualifications), 'QUALIFICATIONS_EXPIRED_OR_ALL');

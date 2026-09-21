@@ -4,6 +4,31 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.14.0
+
+### Added
+
+- `orchestrator_batch` collects 2–8 independent read-only tasks with two workers, a bounded queue, one child round per task and no model-driven scheduling or synthesis. Callers provide nonoverlapping scopes; the plugin does not infer dependencies.
+- `orchestrator_batch_read` returns saved summaries by default and bounded findings with `details:true`. Batch records support list/forget, prevent same-ID replay and protect referenced assignments from ordinary deletion.
+- Batch findings have explicit completion/partial/clarification states and evidence references. Malformed or oversized results remain unreadable rather than losing fields silently. Valid partial findings retain their incomplete execution status.
+- Timing, round commitments and returned child IDs are reported separately. Native usage and model-call totals remain unknown; no measured total-token savings or spending cap is claimed.
+
+### Fixed
+
+- Compaction shares delegation admission, synchronous ID reservations and cancellation ownership. It journals intent before dispatch and records unsuccessful attempts, not only useful summaries.
+- Assignment-store public reads, listings, writes and deletion share an in-process namespace queue, preventing live readers from seeing a partially written revision.
+- Assignment deletion is excluded during owner delegation/compaction/batch activity, and new work cannot enter during its reference check and deletion.
+- Child disposal is memoized on cancellation; slots remain owned until result and teardown settle. Dispatcher queue wait is bounded by the same cooperative deadline.
+- Evidence expiry after journal creation is retained as `failure_code: "EVIDENCE_EXPIRED"` in assignment reads and surfaced by batch/compaction outcomes. Compaction rechecks expiry after its dispatch commitment is saved, before native start.
+- Batch-journal failures preserve `PERSISTENCE_FAILED` as the task reason rather than reporting deadline or cancellation. Usage documentation distinguishes batch-journal aborts from isolated assignment-journal failures.
+- Onboarding checks name all fifteen tools, including batch list/forget support; compaction documentation distinguishes pre-record refusals from recorded failures.
+
+### Validation scope
+
+Deterministic offline tests cover overlapping workers, FIFO admission, duplicate IDs, compaction failures, queued cancellation, disposal draining, persistence failures, reference protection and recovery without replay. Native host activation, live provider throughput, token usage and billing are not established by these fixtures. Coordination remains single-process; no host-wide provider quota controller or parallel-write support is added.
+
+A separate [27-trial live benchmark](docs/BENCHMARK.md) of the pre-review-fix snapshot found no token savings: parallel workers plus integration used 92.2% more tokens than one agent, while finishing 23.5% faster than the same workers run sequentially. README feature claims distinguish smoke qualification from competence, parent context from total tokens, and deterministic distribution from live load balancing. The benchmark used temporary host telemetry, not a new usage-ledger feature in this plugin.
+
 ## 1.13.0
 
 A second round of outside review found five more defects. Three are honesty defects: the

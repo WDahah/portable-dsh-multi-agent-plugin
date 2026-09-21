@@ -53,7 +53,9 @@ Historical API rate estimates are not current invoices. Subscription/native-agen
 
 Direct tasks have a 15-minute wall-clock deadline beginning at **plan time**, default3/max8 rounds, bounded context/output and requested output-token limits. Native tasks also have bounded rounds/time/context. Adapter behavior can differ; do not equate a requested token limit with proven upstream enforcement. Cancellation is cooperative and cannot prove billing stopped.
 
-Concurrency is deliberately small. Per owner session, **at most 2 qualifications and 2 delegations run at once** (`QUALIFICATION_BUSY`, `DELEGATION_BUSY`), one run per task ID (`CONCURRENT_TASK`), and at most 64 owner sessions and 64 loaded tasks (`OWNER_CAPACITY`, `TASK_CAPACITY`). These are refusals, not queues: a third concurrent delegation is rejected rather than delayed, and the caller decides whether to retry.
+Concurrency is deliberately small. Per owner session, **at most 2 qualifications and 2 native delegation/compaction assignments run at once** (`QUALIFICATION_BUSY`, `DELEGATION_BUSY`). Batch workers share those native slots and may wait in an internal FIFO queue of at most 8 pending reservations (`DELEGATION_QUEUE_FULL`); ordinary delegation and compaction still refuse rather than queue. One batch per owner accepts 2–8 independent read-only tasks. Slots remain owned until child result and disposal settle, even after cancellation. This is not a host-wide/provider-wide rate limit: qualification and direct execution do not share the native admission pool.
+
+Direct tasks still enforce one run per task ID (`CONCURRENT_TASK`), with at most 64 owner sessions and 64 loaded tasks (`OWNER_CAPACITY`, `TASK_CAPACITY`), not a shared direct-call semaphore. Batch limits bound task fan-out, not model calls inside each child or total tokens. Batch output is collected worker data, not a policy-approved merge. Writes, dependency scheduling and automatic recovery/replay are outside the batch interface. Scope strings cannot narrow the filesystem sandbox; the host tool allowlist enforces read-only tools, while path selection remains a task instruction.
 
 ## Output acceptance
 

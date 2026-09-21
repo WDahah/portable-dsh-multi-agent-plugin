@@ -23,7 +23,7 @@ A portable **DSH/Cordis native plugin** and offline tests—not a standalone AI 
    `--state-root` is optional; specifying it isolates your state. Supply exactly one of `--tools-module` or the alternative `--harness-root "<absolute installed host directory>"` discovery option, not both. This package uses Node built-ins; `npm install` is not needed. These commands do **not** install DSH.
 5. Inspect `.local/entry.mjs` and `.local/host-patch.yml`. Setup generates only those files. Doctor is offline; neither command proves live provider access.
 6. Back up the **active user-owned host patch** and merge the generated root insertion. Do not overwrite the patch wholesale, edit shipped presets, or blindly install colliding `orchestrator_*` tools. Follow the actual host's reload procedure.
-7. Verify that the host exposes the thirteen orchestrator tools. Authenticate providers through the supported host UI, never by putting secrets in chat.
+7. Verify that the host exposes the fifteen orchestrator tools. Authenticate providers through the supported host UI, never by putting secrets in chat.
 8. In the **same root agent session** that will use the chosen project, discover real routes and run a small number of exact `orchestrator_qualify` probes. They can consume quota or money. Previous-machine successes do not transfer; evidence expires after24 hours.
 9. Start with a read-only `orchestrator_delegate` task using [examples/task.json](examples/task.json) plus the scoped prompt in [examples/PROJECT-PROMPT.md](examples/PROJECT-PROMPT.md).
 

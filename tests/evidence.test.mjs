@@ -66,8 +66,9 @@ test('selection carries the evidence that authorized it', () => {
   assert.equal(domain.qualification.domainEvidence, true);
 });
 test('a delegation records the evidence and a verifier can match it', async () => {
-  const record = qualification('codex-terra');
-  const selected = selectRoute({task: task(), qualifications: [record], now: NOW});
+  const now = Date.now();
+  const record = qualification('codex-terra', 'balanced', {issuedAt: now - 1000, expiresAt: now + 3600000});
+  const selected = selectRoute({task: task(), qualifications: [record], now});
   const dispatcher = createAgentDispatcher({root: fresh(), owner, getSubagents: () => ({async start() {
     return {id: 'child', result: Promise.resolve({stopReason: 'completed', output: [{type: 'text', text: 'done'}]}), async dispose() {}};
   }})});
