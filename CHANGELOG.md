@@ -4,6 +4,45 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.11.0
+
+Acting on user feedback about task selection. Two of the four proposals were already
+possible and are now documented rather than changed; three concrete gaps are fixed.
+
+### Changed
+
+- **Escalation now needs grounds that corroborate each other.** Any single signal used to
+  be sufficient, which sent **82% of ordinary task shapes** to the most expensive tier: a
+  low-risk task reached `advanced` purely because its caller described it as complex.
+  High risk, complexity and restricted data each count as one ground and any two escalate,
+  while critical risk and the roles that exist to demand a stronger model still escalate
+  alone, because both are statements about the work rather than descriptions of it.
+  Measured across 408 task shapes: 36 move from advanced to balanced, none move up.
+- Every selection reports `grounds`, so a pool is explainable. An empty list means
+  nothing about the task argued for a stronger model.
+
+### Added
+
+- **A bare `role: "review"` now prefers a different provider.** Cross-provider review
+  previously applied only when `reviews: <run_id>` named a subject, so a role whose whole
+  purpose is independent judgement could quietly run on the provider it would review.
+  `avoid_provider` overrides the inference when the caller knows who produced the work.
+- **`routed_by` records who chose the route**, `SELECTOR` or `CALLER_SUPPLIED`, with
+  `selection_grounds` for a selector-chosen one. A hand-picked route and a computed one
+  were previously indistinguishable in the journal, and only the second is reproducible.
+
+### Unchanged by decision
+
+Fixed pool priority and the use of qualified alternatives were raised as problems. Both
+already have mechanisms — `spread`, `failover`, `reviews` and explicit `pool` — and
+all of them stay opt-in. Making distribution automatic would cost the property that the
+same task with the same evidence reaches the same model, which is what makes a run
+reproducible and an audit trail meaningful.
+
+Economy remains reachable only by asking for it. An earlier draft of this release routed
+routine low-risk work there automatically; that was reverted before release because the
+cheap tier is the least likely to be qualified, so the change turned ordinary work into
+refusals and lowered quality where it did succeed.
 ## 1.10.0
 
 Reported: qualifying every route in a pool did not make those routes receive work. That was

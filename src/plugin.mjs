@@ -1,6 +1,6 @@
 import path from 'node:path';
 import {registerLifetimeTool} from './cancellation.mjs';
-import {ROUTES, POOL_PRIORITY, expectedEffort, selectRoute} from './routes.mjs';
+import {ROUTES, POOL_PRIORITY, expectedEffort, resolveRole, selectRoute} from './routes.mjs';
 import {createTaskEngine} from './engine.mjs';
 import {createQualificationManager, need, BUILD_ID} from './qualification.mjs';
 import {createAgentDispatcher} from './agent-dispatch.mjs';
@@ -96,7 +96,7 @@ export function createPlugin(defineTool) {
     register('orchestrator_read', 'Read persisted direct-task output and accounting without model dispatch.',
       {task_id: {type: 'string', required: true}, page: {type: 'integer'}}, (args, exec) => owned(exec).engine.read(args.task_id, args.page ?? 0));
     register('orchestrator_delegate', 'Select a qualified route and run a real scoped child agent. Automatic new-child continuation is restricted to readonly tool sets; no error retry.',
-      {...task, run_id: {type: 'string', required: true}, prompt: {type: 'string', required: true}, allowed_tools: {type: 'array', items: {type: 'string'}}, max_rounds: {type: 'integer'}, max_tokens: {type: 'integer'}, reviews: {type: 'string'}, objective: {type: 'json'}, expect_verdict: {type: 'boolean'}, spread: {type: 'boolean'}, failover: {type: 'boolean'}}, async (args, exec) => {
+      {...task, run_id: {type: 'string', required: true}, prompt: {type: 'string', required: true}, allowed_tools: {type: 'array', items: {type: 'string'}}, max_rounds: {type: 'integer'}, max_tokens: {type: 'integer'}, reviews: {type: 'string'}, objective: {type: 'json'}, expect_verdict: {type: 'boolean'}, spread: {type: 'boolean'}, failover: {type: 'boolean'}, avoid_provider: {type: 'string'}}, async (args, exec) => {
         need(enabled, 'DISABLED');
         // A review should not land on the model that produced the run it judges, so the
         // subject's provider is avoided when one can be found.
@@ -104,7 +104,14 @@ export function createPlugin(defineTool) {
         if (args.reviews !== undefined) {
           const subject = await owned(exec).agents.read(args.reviews);
           avoid = subject.provider;
+        } else if (resolveRole(args.task?.role)?.role === 'review') {
+          // A review with no named subject still means judging work somebody else did. The
+          // role promises independence, so the pool leader that would ordinarily have
+          // produced that work is avoided rather than quietly reviewing itself.
+          avoid = ROUTES.find(r => r.id === POOL_PRIORITY.advanced[0])?.provider;
         }
+        // An explicit hint always wins: the caller knows who produced the work.
+        if (typeof args.avoid_provider === 'string' && args.avoid_provider) avoid = args.avoid_provider;
         const {entry, selected} = await choose(args, exec, avoid); if (selected.status !== 'SELECTED') return selected;
         // The canonical role labels and records the run, so a deprecated code never leaks
         // into the session tree or the journal.
@@ -112,7 +119,10 @@ export function createPlugin(defineTool) {
           {...args, role: selected.role, intent: selected.intent, evidence: selected.qualification,
             independence: selected.independence ?? null,
             // Failover is opt-in; without it a refused route fails rather than moving.
-            alternates: args.failover === true ? selected.alternates : []},
+            alternates: args.failover === true ? selected.alternates : [],
+            // The selector chose this route from the task and its evidence, so the record
+            // says so rather than leaving a reader to assume it.
+            grounds: selected.grounds, routing_provenance: 'SELECTOR'},
           selected.route, selected.effort, exec)};
       }, 910000);
     register('orchestrator_delegate_read', 'Read immutable child-assignment output; never restarts the child.',

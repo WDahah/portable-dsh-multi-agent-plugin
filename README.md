@@ -61,7 +61,7 @@ standard, low risk  ->  codex/gpt-5.6-terra   medium   (balanced)
 review,   low risk  ->  claude/claude-opus-5  high     (advanced)
 ```
 
-Cheap models handle routine work; expensive ones are reserved for review, high risk, or complex tasks. An `escalate` flag reaches the long-horizon pool.
+Reaching the expensive tier takes **grounds that corroborate each other**, not one label. A task described as complex stays on balanced; complex *and* high-risk escalates, as does critical risk or a role that exists to demand a stronger model. Every selection reports the `grounds` behind its pool, so the choice is always explainable and an `escalate` flag remains the caller's own decision.
 
 Five roles — `standard`, `deep`, `review`, `vision`, `domain` — each naming routing you can observe. A free-text `intent` records what the task is *for* and appears in the child's label, without ever changing the model.
 

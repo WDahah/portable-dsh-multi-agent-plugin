@@ -176,7 +176,36 @@ The numeric codes `R01`–`R12` shipped since 1.0.0 still work and route exactly
 
 `R02`, `R03`, `R06`, `R10` and `R12` were never documented; each maps to the behavior it already produced, not to a meaning invented after the fact. `R08` and `R09` were always identical, so both map to `domain`.
 
-Ordinary tasks default to balanced routing. An advanced role, high/critical risk, or complex work selects advanced; escalation selects long-horizon. An explicit `pool` can select economy or another deliberate policy choice, and beats everything else. It is not a silent fallback. Exact model IDs and efforts come from `src/routes.mjs` and live host evidence, never from guessing a brand label.
+## Escalation needs grounds, not a label
+
+Ordinary work runs on **balanced**. Reaching the advanced tier requires grounds that corroborate each other, because one description of a task is not evidence that it is hard:
+
+| Task | Pool | Grounds |
+|---|---|---|
+| nothing unusual | balanced | `[]` |
+| `complexity: complex` | balanced | `COMPLEX`, `INSUFFICIENT_FOR_ADVANCED` |
+| `risk: high` | balanced | `HIGH_RISK`, `INSUFFICIENT_FOR_ADVANCED` |
+| `risk: high` + `complexity: complex` | **advanced** | `HIGH_RISK`, `COMPLEX` |
+| `risk: critical` | **advanced** | `CRITICAL_RISK` |
+| role `deep`, `review`, `domain` | **advanced** | `ROLE_REQUIRES_ADVANCED` |
+| `escalate: true` | **long-horizon** | `CALLER_REQUESTED_ESCALATION` |
+
+Critical risk and an advanced role each escalate alone, because both are statements *about* the work rather than descriptions *of* it. High risk, complexity, and restricted data each count as one ground; any two together escalate.
+
+Every selection reports `grounds`, so a pool is always explainable. An empty list means nothing about the task argued for a stronger model, which is itself the answer to "why is this on balanced".
+
+**Economy is never reached by inference.** It is the tier least likely to be qualified, so falling into it automatically would turn ordinary work into a refusal, and quietly lower quality where it did succeed. Ask for it with `pool: "economy"`.
+
+An explicit `pool` beats everything, in both directions. It is a deliberate policy choice, not a fallback. Exact model IDs and efforts come from `src/routes.mjs` and live host evidence, never from guessing a brand label.
+
+## Who chose the route
+
+Every assignment records `routed_by`:
+
+- `SELECTOR` — the plugin chose from the task and its evidence, so the choice is reproducible
+- `CALLER_SUPPLIED` — the route came from the caller, and re-running the task would not necessarily reach it
+
+`selection_grounds` carries the grounds behind a selector-chosen route, so an audit can tell a routing decision from a hand-picked one rather than assuming.
 
 ## Pools are priority-ordered, not balanced
 
