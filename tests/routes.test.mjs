@@ -32,7 +32,14 @@ test('balanced priorities are deterministic and exact medium, then qualified alt
 });
 test('advanced roles, high risk and complexity; escalation selects long pool', () => {
   for (const role of ['R03', 'R07', 'R12']) assert.equal(select({role}, [qualification('codex-sol', 'advanced')]).pool, 'advanced');
-  for (const change of [{risk: 'high'}, {risk: 'critical'}, {complexity: 'complex'}]) assert.equal(select(change, [qualification('codex-sol', 'advanced')]).effort, 'high');
+  // Critical risk stands alone; high risk or complexity alone no longer escalates, because
+  // one description of a task is not evidence that it needs the most expensive tier.
+  assert.equal(select({risk: 'critical'}, [qualification('codex-sol', 'advanced')]).effort, 'high');
+  for (const alone of [{risk: 'high'}, {complexity: 'complex'}]) {
+    assert.equal(select(alone, [qualification('codex-terra')]).pool, 'balanced');
+  }
+  // Together they corroborate each other and do escalate.
+  assert.equal(select({risk: 'high', complexity: 'complex'}, [qualification('codex-sol', 'advanced')]).pool, 'advanced');
   const r = select({escalate: true}, [qualification('claude-fable', 'long-horizon')]);
   assert.equal(r.pool, 'long-horizon'); assert.equal(r.effort, 'xhigh');
   assert.equal(expectedEffort('kimi-k3', 'long-horizon'), 'max');
@@ -41,7 +48,9 @@ test('economy only explicit, no cross-pool fallback, reserve routes not silently
   const luna = qualification('codex-luna', 'economy');
   assert.equal(select({}, [luna]).status, 'UNAVAILABLE');
   assert.equal(select({pool: 'economy'}, [luna]).route.id, 'codex-luna');
-  assert.equal(select({risk: 'high'}, [qualification('codex-terra')]).status, 'UNAVAILABLE');
+  // High risk alone stays on balanced, so terra now serves it; two grounds still refuse.
+  assert.equal(select({risk: 'high'}, [qualification('codex-terra')]).route.id, 'codex-terra');
+  assert.equal(select({risk: 'high', complexity: 'complex'}, [qualification('codex-terra')]).status, 'UNAVAILABLE');
   assert.equal(ROUTES.filter(r => r.pools.length === 0).length, 4);
   assert.equal(ROUTES.find(r => r.id === 'deepseek-v4-pro').pricing, null);
   assert.equal(ROUTES.find(r => r.id === 'deepseek-v4-vision').pricing, null);

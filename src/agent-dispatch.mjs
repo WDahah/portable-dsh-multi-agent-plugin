@@ -120,6 +120,11 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
         // Every failover attempt, allowed or refused, so the record shows which provider
         // was asked first and why the run moved rather than only where it ended up.
         failovers: [], standby_available: standby.length,
+        // Who chose this route. A selector-chosen run is reproducible from its task and
+        // evidence; a caller-supplied one is not, and an audit should not have to guess
+        // which it is reading.
+        routed_by: args.routing_provenance === 'CALLER_SUPPLIED' ? 'CALLER_SUPPLIED' : 'SELECTOR',
+        selection_grounds: Array.isArray(args.grounds) ? [...args.grounds] : null,
         createdAt: Date.now(), deadlineAt: Date.now() + deadlineMs};
       await save();
       scope = scopedSignal(exec.signal, deadlineMs); controllers.add(scope.controller);
@@ -240,6 +245,7 @@ export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 9
       reviews: record.reviews ?? null, independence: record.independence ?? null,
       objective: record.objective ?? null, verdict: record.verdict ?? null,
       failovers: record.failovers ?? [], standby_available: record.standby_available ?? 0,
+      routed_by: record.routed_by ?? 'SELECTOR', selection_grounds: record.selection_grounds ?? null,
       verdict_source: record.verdict_source ?? null,
       approval_required: false, automatic_retry: false, continuation_safe: record.continuation_safe, continuation_uses_new_child: true};
   }

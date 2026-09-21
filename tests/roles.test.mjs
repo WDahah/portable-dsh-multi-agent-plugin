@@ -123,9 +123,12 @@ test('unknown roles are refused, including plausible invented ones', () => {
 });
 test('risk, complexity and explicit pool still override the role', () => {
   const evidence = fullEvidence();
-  // A balanced role reaches advanced through risk or complexity.
-  assert.equal(select({role: 'standard', risk: 'high'}, evidence).pool, 'advanced');
-  assert.equal(select({role: 'standard', complexity: 'complex'}, evidence).pool, 'advanced');
+  // A balanced role reaches advanced when the grounds corroborate each other, rather than
+  // on one description of the work by itself.
+  assert.equal(select({role: 'standard', risk: 'high', complexity: 'complex'}, evidence).pool, 'advanced');
+  assert.equal(select({role: 'standard', risk: 'critical'}, evidence).pool, 'advanced');
+  assert.equal(select({role: 'standard', risk: 'high'}, evidence).pool, 'balanced');
+  assert.equal(select({role: 'standard', complexity: 'complex'}, evidence).pool, 'balanced');
   assert.equal(select({role: 'standard', escalate: true}, evidence).pool, 'long-horizon');
   // An explicit pool beats even an advanced role.
   assert.equal(select({role: 'review', pool: 'economy'}, evidence).pool, 'economy');

@@ -88,6 +88,36 @@ export function expectedEffort(routeOrId, pool) {
   // vision and the remaining pools use the standard tier; only advanced/long escalate.
   return entry.effortsExpected[pool === 'long-horizon' ? 'long' : pool === 'advanced' ? 'deep' : 'standard'];
 }
+/** Decide the pool from what the task actually says about itself.
+ *
+ * Any single signal used to be enough, which sent 82% of ordinary tasks to the most
+ * expensive tier: a low-risk task reached `advanced` purely because its caller described it
+ * as complex. Escalation now needs grounds that corroborate each other, so the strong tier
+ * is reserved for work that is genuinely demanding rather than merely labelled that way.
+ *
+ * Critical risk and the roles that exist to demand a stronger model still escalate alone,
+ * because both are explicit statements about the work rather than descriptions of it. */
+function escalation(task, resolved) {
+  if (task.escalate) return {pool: 'long-horizon', grounds: ['CALLER_REQUESTED_ESCALATION']};
+  const grounds = [];
+  // A role whose whole meaning is "this warrants a stronger model" is sufficient by itself.
+  if (ROLES[resolved.role].pool === 'advanced') grounds.push('ROLE_REQUIRES_ADVANCED');
+  if (task.risk === 'critical') grounds.push('CRITICAL_RISK');
+  else if (task.risk === 'high') grounds.push('HIGH_RISK');
+  if (task.complexity === 'complex') grounds.push('COMPLEX');
+  // Restricted data is not a difficulty signal, but it is a reason not to economise.
+  if (task.dataClass === 'restricted') grounds.push('RESTRICTED_DATA');
+  const sufficient = grounds.includes('ROLE_REQUIRES_ADVANCED') || grounds.includes('CRITICAL_RISK')
+    // Two weaker signals together are evidence; one on its own is a description.
+    || grounds.length >= 2;
+  if (sufficient) return {pool: 'advanced', grounds};
+  // Everything else is balanced. Economy stays reachable only by asking for it: the cheap
+  // tier is the one least likely to be qualified, so falling into it automatically would
+  // turn ordinary work into an UNAVAILABLE refusal, and quietly lower quality where it did
+  // succeed. Choosing to economise is a decision a caller makes, not one inferred from a
+  // task looking easy.
+  return {pool: 'balanced', grounds: grounds.length ? [...grounds, 'INSUFFICIENT_FOR_ADVANCED'] : []};
+}
 function taskPolicy(task) {
   const resolved = task ? resolveRole(task.role) : null;
   if (!task || !resolved || !nonempty(task.category) ||
@@ -98,11 +128,10 @@ function taskPolicy(task) {
   if (task.pool !== undefined && !Object.hasOwn(POOL_PRIORITY, task.pool)) return null;
   if (task.dataClass !== undefined && !['public', 'internal', 'confidential', 'restricted'].includes(task.dataClass)) return null;
   if (task.capabilities !== undefined && (!Array.isArray(task.capabilities) || task.capabilities.some(c => !allowedCapabilities.has(c)))) return null;
-  const advanced = ROLES[resolved.role].pool === 'advanced';
-  const normal = task.escalate ? 'long-horizon' : advanced || ['high', 'critical'].includes(task.risk) || task.complexity === 'complex' ? 'advanced' : 'balanced';
+  const {pool: normal, grounds} = escalation(task, resolved);
   // Explicit pool is a deliberate policy override, never an unavailable-route fallback.
-  return {role: resolved, pool: task.pool ?? normal,
-    reason: task.pool ? 'EXPLICIT_POOL' : task.escalate ? 'ESCALATED' : normal === 'advanced' ? 'ROLE_OR_RISK_OR_COMPLEXITY' : 'BALANCED_DEFAULT'};
+  return {role: resolved, pool: task.pool ?? normal, grounds,
+    reason: task.pool ? 'EXPLICIT_POOL' : task.escalate ? 'ESCALATED' : normal === 'advanced' ? 'ESCALATION_JUSTIFIED' : 'BALANCED_DEFAULT'};
 }
 function recordReason(q, route, effort, task, now, roleName) {
   if (q.schemaVersion !== 1 || q.qualificationType !== 'smoke' || q.issuer?.kind !== 'plugin-service' ||
@@ -134,7 +163,10 @@ function recordReason(q, route, effort, task, now, roleName) {
  * be migrated without guessing, and carry intent through unchanged as a recorded label. */
 function roleView(policy, task) {
   return {role: policy.role.role, roleSupplied: policy.role.supplied,
-    roleDeprecated: policy.role.deprecated, intent: task.intent ?? null};
+    roleDeprecated: policy.role.deprecated, intent: task.intent ?? null,
+    // Why this pool and not a cheaper one. An empty list means nothing about the task
+    // argued for escalation, which is itself the answer to "why is this on balanced".
+    grounds: policy.grounds ?? []};
 }
 /** Input records are detached data read by the plugin from its private journal, NEVER tool arguments.
  * Schema/provenance labels are not authentication or cryptographic proof. */
