@@ -49,7 +49,7 @@ It does not refuse the review, and it does not quietly pass it off as independen
 
 This is the decision everything else rests on.
 
-A reviewer returns a structured verdict: `verified`, `partial`, `failed`, or `needs-clarification`. The plugin stores it verbatim and reads **only the declared state** to decide whether another cycle may run. It never reads prose to decide whether work is acceptable, because that judgement is not a router's to make.
+A reviewer returns a structured verdict: `verified`, `partial`, `failed`, or `needs-clarification`. The plugin normalizes it to storage bounds, reports truncation and dropped entries, and preserves the declared state. Loop control uses the declared fields and completion status, not an assessment of the work. It never reads prose to decide whether work is acceptable, because that judgement is not a router's to make.
 
 Concretely, prose is refused as a verdict:
 

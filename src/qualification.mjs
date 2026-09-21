@@ -48,6 +48,16 @@ async function safeDirectory(directory, create = false) {
   }
   return true;
 }
+// Share the allocation queue across store instances for the same namespace. Concurrent
+// assignments must not both claim the last directory slot before either creates it.
+const recordStoreQueues = new Map();
+function serializeRecordSave(base, operation) {
+  const result = (recordStoreQueues.get(base) ?? Promise.resolve()).then(operation);
+  const settled = result.then(() => {}, () => {});
+  recordStoreQueues.set(base, settled);
+  settled.then(() => {if (recordStoreQueues.get(base) === settled) recordStoreQueues.delete(base);});
+  return result;
+}
 /** Owned JSON only. Immutable revisions, file fsync, latest corruption refuses recovery. */
 export function createRecordStore(root, owner, namespace) {
   need(path.isAbsolute(root) && typeof owner === 'string' && owner.length > 0 && owner.length <= 256);
@@ -70,21 +80,32 @@ export function createRecordStore(root, owner, namespace) {
     need(body.version === 1 && body.owner === owner && body.key === key && body.revision === names.length && sha(JSON.stringify(body)) === sha256, 'CORRUPT_JOURNAL');
     return {revision: body.revision, data: body.data};
   }
-  async function save(key, data, expectedRevision) {
-    const directory = location(key); await safeDirectory(directory, true);
-    const current = await read(key);
-    need((current?.revision || 0) === expectedRevision && expectedRevision < 1024, 'JOURNAL_CONFLICT');
-    const body = {version: 1, owner, key, revision: expectedRevision + 1, data};
-    const encoded = JSON.stringify({...body, sha256: sha(JSON.stringify(body))});
-    need(Buffer.byteLength(encoded) <= 2 * 1024 * 1024, 'JOURNAL_BOUND');
-    const handle = await fs.open(path.join(directory, String(body.revision).padStart(8, '0') + '.json'), 'wx', 0o600);
-    try {await handle.writeFile(encoded); await handle.sync();} finally {await handle.close();}
-    return body.revision;
-  }
-  async function entries() {
+  async function directories() {
     if (!await safeDirectory(base)) return [];
     const found = await fs.readdir(base, {withFileTypes: true});
     need(found.length <= 256 && found.every(e => e.isDirectory() && !e.isSymbolicLink() && /^x[a-f0-9]{64}$/.test(e.name)), 'CORRUPT_JOURNAL');
+    return found;
+  }
+  async function save(key, data, expectedRevision) {
+    const directory = location(key);
+    return serializeRecordSave(base, async () => {
+      const found = await directories();
+      // Count directories, including empty ones, exactly as listing does. Refuse before
+      // creating anything, while still allowing revisions of existing records at capacity.
+      need(found.some(entry => entry.name === key) || found.length < 256, 'JOURNAL_BOUND');
+      const current = await read(key);
+      need((current?.revision || 0) === expectedRevision && expectedRevision < 1024, 'JOURNAL_CONFLICT');
+      const body = {version: 1, owner, key, revision: expectedRevision + 1, data};
+      const encoded = JSON.stringify({...body, sha256: sha(JSON.stringify(body))});
+      need(Buffer.byteLength(encoded) <= 2 * 1024 * 1024, 'JOURNAL_BOUND');
+      await safeDirectory(directory, true);
+      const handle = await fs.open(path.join(directory, String(body.revision).padStart(8, '0') + '.json'), 'wx', 0o600);
+      try {await handle.writeFile(encoded); await handle.sync();} finally {await handle.close();}
+      return body.revision;
+    });
+  }
+  async function entries() {
+    const found = await directories();
     const records = [];
     for (const entry of found) {const value = await read(entry.name); if (value) records.push({key: entry.name, revision: value.revision, data: value.data});}
     return records;

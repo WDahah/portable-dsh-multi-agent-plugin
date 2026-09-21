@@ -117,7 +117,7 @@ A read-only task may continue in a new child after a token limit. A task that ca
 
 A review that runs on the model it is judging shares that model's blind spots. When a run declares `reviews`, the orchestrator prefers a candidate from a **different provider**, and the reviewer is handed the subject's request and answer as fenced data it is explicitly told not to obey.
 
-When no other provider is qualified, the review still happens — and records `independence: false` with a reason, rather than passing as independent.
+When no other provider is qualified, the review still happens — and records `independence: false` with a reason, rather than passing as independent. The same applies if a review *fails over* onto the provider it was avoiding: independence is recomputed against the route that actually ran, and the failover entry keeps the before and after, so the claim can never outlive the fact.
 
 `orchestrator_iterate` turns that into a bounded loop: review, revise from the findings, review again, capped at 3 cycles. It advances only on a **declared verdict** and never on its own reading of the work:
 
@@ -200,7 +200,7 @@ Full argument details are in [docs/USAGE.md](docs/USAGE.md).
 
 Being clear about this matters more than the feature list, because every claim above is bounded by it.
 
-- **It does not judge your work.** A verdict is the reviewer's declaration, stored verbatim. The plugin reads the declared state to decide whether a cycle may continue; it never reads prose to decide whether work is good.
+- **It does not judge your work.** A verdict is the reviewer's declaration, normalized to storage bounds with truncation and dropped entries reported. The plugin reads the declared state to decide whether a cycle may continue; it never reads prose to decide whether work is good.
 - **It is not a budget cap.** `$1` is a soft target; requests can exceed it. Most routes report `costUnknown` with token counts instead of a price, and unknown cost never means free.
 - **It is not a security boundary.** It connects to real host services under your existing sandbox, permissions and approval policy.
 - **It does not certify competence.** A passed probe shows one route answered one bounded challenge. Specialist-domain and confidential work require a named human attestation precisely because no probe can establish them.
@@ -215,7 +215,11 @@ This was written by an AI agent under human direction, and the figures come from
 
 The quickstart above is three lines rather than one because a reader hit a parse error in Windows PowerShell running what the README told them to run. The escalation rule changed because a reader pointed out that qualifying more models did not give them work.
 
-That is the pattern worth judging the project by: claims here are measured, corrections are kept visible, and the bugs users actually hit are the ones that shaped it.
+The plugin has also been used on itself. Sending the codebase to a model from another provider for review produced eight real defects across two rounds — including a verdict that could approve work it had just called broken, and a review that could fail over onto the provider it was avoiding while still recording `independent: true`. That last one was a false claim in the project's headline feature, and neither 182 passing tests nor the author's own reading had found it.
+
+Those findings were fixed, but **the fixes were not trusted because a model proposed them**. Each defect was reproduced first, each fix checked against that reproduction, and the regression tests were run against the pre-fix commit to confirm they actually fail on the old code — seven of eight did. A review from one model and verification by another is the same discipline this plugin exists to support.
+
+That is the pattern worth judging the project by: claims here are measured, corrections are kept visible, and the bugs users actually hit — or that another model finds — are the ones that shaped it.
 
 ## Start here
 

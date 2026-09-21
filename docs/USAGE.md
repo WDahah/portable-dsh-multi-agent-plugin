@@ -95,7 +95,7 @@ The check reads what the reviewer **declared**, not what survived storage limits
 
 ### Verdicts are normalized, not verbatim
 
-`parseVerdict` trims the summary to 500 characters, caps findings at fifty, and drops entries that are malformed or too long. The stored verdict reports what that cost in `normalized`, for example `["SUMMARY_TRUNCATED", "FINDINGS_DROPPED:1"]`, so a reader is not left to discover it by comparing against something they no longer have.
+`parseVerdict` trims the summary to 500 characters, caps findings and verified entries at fifty and clarifications at twenty-five, and drops entries that are malformed or too long. The stored verdict reports these losses in `normalized`: `SUMMARY_TRUNCATED`, `FINDINGS_DROPPED:<count>`, `CLARIFICATIONS_DROPPED:<count>`, and `VERIFIED_DROPPED:<count>`.
 
 On `VERDICT_UNREADABLE` the cycle also reports `reviewState` and an `unreadableCause`, because a reviewer cut off by a token limit and one that answered in prose need opposite responses:
 
@@ -113,7 +113,7 @@ A reviewer that answers only through the structured channel still leaves a reada
 
 The `objective` travels to every child as fenced data, and the reviewer reports drift as `onObjective: false`. Drift is declared by the reviewer, never inferred by comparing text.
 
-**When you omit `objective`, the loop inherits the one the reviewed run recorded.** This matters more than it sounds: a reviser is deliberately not re-sent the original request, because the objective is supposed to carry it. Without either, a loop can satisfy its reviewer while quietly losing the task it started from. The result reports `objectiveSource` — `CALLER`, `INHERITED_FROM_SUBJECT`, or `NONE` — and when it is `NONE` the reviser is given the original request back instead.
+**When you omit `objective`, the loop inherits the one the reviewed run recorded.** The result reports `objectiveSource` — `CALLER`, `INHERITED_FROM_SUBJECT`, or `NONE`. Reviewers and revisers also receive the original request on every cycle: an objective does not replace its path restrictions or prohibitions. Revisions preserve that request separately from their own prompt and findings as `original_prompt`.
 
 ## Compaction
 
@@ -125,7 +125,7 @@ The `objective` travels to every child as fenced data, and the reviewer reports 
 | 12,000 chars | 16% |
 | 24,000 chars | 18% |
 
-Compaction is lossy, so it only ever replaces **working context**: the full revision stays readable through `orchestrator_delegate_read`, and the final answer is never a summary. A compaction that is not genuinely smaller is refused and reported rather than applied.
+Compaction is lossy, so it only ever replaces **working context**: the full revision stays readable through `orchestrator_delegate_read`, and `finalSubject` names that revision, never its summary. Reviews retain the artifact's author for provider independence and record the summary separately as `context_run`. A compaction that did not complete or is not genuinely smaller is refused and reported rather than applied.
 
 ## Finding and clearing saved state
 
@@ -145,7 +145,7 @@ A direct task's readable id is kept in a small side index beside the journal, be
 
 `qualifications` accepts `expired` (prune only lapsed evidence) or `all`. Deletion is permanent and is refused while that exact run or task is in flight, so a forget cannot strand work mid-write. A forgotten id becomes available again — deletion leaves no tombstone.
 
-Deleting a run that a later review points at is also refused, with `ASSIGNMENT_REFERENCED_BY_REVIEW` and the `referenced_by` list naming what blocks it. Cascading would destroy the review and clearing its link would erase what it judged, so neither happens. Delete those reviews first, or pass `force: true` to accept a dangling reference deliberately.
+Deleting a run that a later review points at (through `reviews` or `context_run`) is also refused, with `ASSIGNMENT_REFERENCED_BY_REVIEW` and the `referenced_by` list naming what blocks it. Cascading would destroy the review and clearing its link would erase what it judged, so neither happens. Delete those reviews first, or pass `force: true` to accept a dangling reference deliberately.
 
 `orchestrator_read` and `orchestrator_delegate_read` also return the original `prompt`, so a saved record shows what was asked, not only what came back.
 
@@ -262,6 +262,21 @@ Pass `failover: true` to let a run move to a standby route when the first one re
 Anything else stays put. A mid-stream failure, an unnamed error code, or any write-capable run records the attempt with its reason — `NOT_A_PRE_DISPATCH_REFUSAL`, `CHILD_ALREADY_PRODUCED_OUTPUT`, `WRITE_SCOPE_CANNOT_BE_REPEATED_BLIND` — and fails rather than risking a repeated side effect.
 
 Every failover, allowed or refused, is recorded in `failovers` on the assignment, and the round that moved is marked `FAILED_OVER` with the provider code that caused it. A run that moves is authorized by the **new** route's evidence, never the old one's.
+
+### Failing over can end a review's independence
+
+A review avoids the provider it judges, but its standby routes may include that provider. If the independent route refuses and the run moves, the review ends up on the provider it was avoiding.
+
+`independence` is therefore recomputed against the route that **actually ran**, not the one originally selected:
+
+```json
+{"independent": false, "avoidedProvider": "codex",
+ "reason": "FAILOVER_TO_AVOIDED_PROVIDER"}
+```
+
+The failover entry carries `independence_before` and `independence_after`, so an audit sees that the relationship changed rather than only its final state. Failing over onto a *third* provider stays independent and is reported as such.
+
+This matters more than it sounds: before 1.13.0 the record kept the independence computed for the route that never ran, so a review could assert it was independent of the provider it had just moved to. Independent review is this plugin's central claim, and a record that can assert it falsely is worse than one that does not claim it at all.
 
 ## Direct-model tasks
 
