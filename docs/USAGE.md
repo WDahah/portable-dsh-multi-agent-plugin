@@ -178,6 +178,44 @@ The numeric codes `R01`–`R12` shipped since 1.0.0 still work and route exactly
 
 Ordinary tasks default to balanced routing. An advanced role, high/critical risk, or complex work selects advanced; escalation selects long-horizon. An explicit `pool` can select economy or another deliberate policy choice, and beats everything else. It is not a silent fallback. Exact model IDs and efforts come from `src/routes.mjs` and live host evidence, never from guessing a brand label.
 
+## Pools are priority-ordered, not balanced
+
+**Qualifying a route does not mean that route will receive work.** Each pool is an ordered list, and by default the first qualified route takes every task:
+
+```
+advanced: codex-sol -> claude-opus -> kimi-k3
+all three qualified  ->  100 tasks, 100 to codex-sol, 0 to the rest
+```
+
+That is deliberate. The same task with the same evidence always reaches the same model, which is what makes a run reproducible and an audit trail meaningful. It is not load balancing and never has been.
+
+Because the consequence is easy to miss, a selection now reports it: `standby` lists the qualified routes that will not run, `selectionOrder` names the rule that chose, and a `LOWER_PRIORITY_ROUTES_IDLE_UNTIL_FAILOVER` warning appears whenever a qualified route is sitting idle. `orchestrator_capacity` reports the same per pool as `selects`, `idle`, and `spreadWouldUse`.
+
+### Spreading work across providers
+
+Pass `spread: true` to `orchestrator_delegate` to rotate across every qualified route in the pool:
+
+```
+without spread  ->  codex-sol 100,  claude-opus 0,   kimi-k3 0
+with spread     ->  codex-sol 33,   claude-opus 33,  kimi-k3 34
+```
+
+The rotation is keyed by `run_id`, so the **same** request still resolves to the same route while different requests land on different ones — distribution without giving up reproducibility.
+
+Spreading never relaxes a rule. It rotates only among routes that already passed every evidence check, and it never overrides review independence: a review still avoids the provider it is judging, rotating only among the routes that keep it independent.
+
+### Failing over to another provider
+
+Pass `failover: true` to let a run move to a standby route when the first one refuses. This is deliberately narrow, requiring **all three** of:
+
+- the failure is a refusal the provider issued up front (`rate_limit`, `overloaded`, `insufficient_quota`, `service_unavailable`, `unauthorized`, and similar)
+- the child produced **no output at all**, so nothing can be repeated
+- the tool scope is read-only, since a write-capable child could have acted before the refusal was reported
+
+Anything else stays put. A mid-stream failure, an unnamed error code, or any write-capable run records the attempt with its reason — `NOT_A_PRE_DISPATCH_REFUSAL`, `CHILD_ALREADY_PRODUCED_OUTPUT`, `WRITE_SCOPE_CANNOT_BE_REPEATED_BLIND` — and fails rather than risking a repeated side effect.
+
+Every failover, allowed or refused, is recorded in `failovers` on the assignment, and the round that moved is marked `FAILED_OVER` with the provider code that caused it. A run that moves is authorized by the **new** route's evidence, never the old one's.
+
 ## Direct-model tasks
 
 Call `orchestrator_plan` with `task`, unique `task_id`, `prompt`, and optionally `max_rounds`, `context_chars`, `max_tokens`; then call `orchestrator_run({"task_id":"..."})`. Read with `orchestrator_read({"task_id":"...","page":0})`. Direct work does not run project tools.

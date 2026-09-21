@@ -138,7 +138,7 @@ function roleView(policy, task) {
 }
 /** Input records are detached data read by the plugin from its private journal, NEVER tool arguments.
  * Schema/provenance labels are not authentication or cryptographic proof. */
-export function selectRoute({task, qualifications, now = Date.now(), avoidProvider} = {}) {
+export function selectRoute({task, qualifications, now = Date.now(), avoidProvider, spread} = {}) {
   const policy = taskPolicy(task);
   const base = {policyVersion: POLICY_VERSION, softTargetUsd: 1, financialFilter: false, qualificationLevel: 'smoke'};
   if (!policy || !Array.isArray(qualifications) || !integer(now)) return {...base, status: 'UNAVAILABLE', reason: 'INVALID_INPUT', reasons: []};
@@ -154,6 +154,10 @@ export function selectRoute({task, qualifications, now = Date.now(), avoidProvid
       return sameA - sameB;
     });
   }
+  // Every eligible route is collected rather than returning at the first match. Knowing the
+  // full set is what lets a caller see which qualified routes are idle, spread work across
+  // them deliberately, or fall through when one provider refuses before doing any work.
+  const eligible = [];
   for (const id of candidates) {
     const route = ROUTES.find(r => r.id === id), effort = expectedEffort(route, policy.pool);
     const matching = qualifications.filter(q => q && q.provider === route.provider && q.model === route.model && q.effort === effort);
@@ -198,22 +202,60 @@ export function selectRoute({task, qualifications, now = Date.now(), avoidProvid
       caseResults: latest[0].caseResults.filter(c => c?.passed === true).map(c => c.name),
       attestedBy: latest[0].attestation?.attestedBy ?? null,
     };
-    const warnings = ['SMOKE_IS_NOT_ROLE_COMPETENCE_CERTIFICATION', 'MODEL_STRING_IS_NOT_IMMUTABLE_BACKEND_IDENTITY'];
-    if (policy.role.deprecated) warnings.push('DEPRECATED_ROLE_CODE');
-    // Independence is reported whenever a provider was to be avoided, so a same-provider
-    // review is visible in the record rather than passing as an independent one.
-    let independence;
-    if (typeof avoidProvider === 'string' && avoidProvider) {
-      const alternatives = candidates.filter(id => ROUTES.find(r => r.id === id)?.provider !== avoidProvider);
-      independence = route.provider === avoidProvider
-        ? {independent: false, reason: alternatives.length ? 'NO_QUALIFIED_ALTERNATIVE_PROVIDER' : 'NO_ALTERNATIVE_PROVIDER_IN_POOL',
-           avoidedProvider: avoidProvider, alternativesConsidered: alternatives}
-        : {independent: true, avoidedProvider: avoidProvider, alternativesConsidered: alternatives};
-      if (!independence.independent) warnings.push('REVIEW_SHARES_PROVIDER_WITH_SUBJECT');
-    }
-    return {...base, status: 'SELECTED', route, effort, pool: policy.pool, reason: policy.reason,
-      ...roleView(policy, task), qualification: evidence,
-      ...(independence ? {independence} : {}), warnings, reasons};
+    eligible.push({route, effort, qualification: evidence});
   }
-  return {...base, status: 'UNAVAILABLE', pool: policy.pool, reason: 'NO_QUALIFIED_ROUTE_IN_POOL', ...roleView(policy, task), reasons};
+  if (!eligible.length) {
+    return {...base, status: 'UNAVAILABLE', pool: policy.pool, reason: 'NO_QUALIFIED_ROUTE_IN_POOL', ...roleView(policy, task), reasons};
+  }
+  // Priority order is the default because a reproducible choice is worth more than an even
+  // one. Spreading is a deliberate request, and it still only ever picks among routes that
+  // already passed every evidence rule above.
+  //
+  // Independence outranks distribution: spreading a review back onto the provider that
+  // produced the work would trade a safety property for an efficiency one. Rotation is
+  // therefore confined to the routes that keep the review independent.
+  const rotatable = typeof avoidProvider === 'string' && avoidProvider
+    && eligible.some(entry => entry.route.provider !== avoidProvider)
+    ? eligible.filter(entry => entry.route.provider !== avoidProvider)
+    : eligible;
+  const ordered = spread
+    ? [...rotate(rotatable, spread), ...eligible.filter(entry => !rotatable.includes(entry))]
+    : eligible;
+  const chosen = ordered[0];
+  const warnings = ['SMOKE_IS_NOT_ROLE_COMPETENCE_CERTIFICATION', 'MODEL_STRING_IS_NOT_IMMUTABLE_BACKEND_IDENTITY'];
+  if (policy.role.deprecated) warnings.push('DEPRECATED_ROLE_CODE');
+  // Independence is reported whenever a provider was to be avoided, so a same-provider
+  // review is visible in the record rather than passing as an independent one.
+  let independence;
+  if (typeof avoidProvider === 'string' && avoidProvider) {
+    const alternatives = candidates.filter(id => ROUTES.find(r => r.id === id)?.provider !== avoidProvider);
+    independence = chosen.route.provider === avoidProvider
+      ? {independent: false, reason: alternatives.length ? 'NO_QUALIFIED_ALTERNATIVE_PROVIDER' : 'NO_ALTERNATIVE_PROVIDER_IN_POOL',
+         avoidedProvider: avoidProvider, alternativesConsidered: alternatives}
+      : {independent: true, avoidedProvider: avoidProvider, alternativesConsidered: alternatives};
+    if (!independence.independent) warnings.push('REVIEW_SHARES_PROVIDER_WITH_SUBJECT');
+  }
+  // Qualified routes that will not run unless the chosen one is unusable. Reporting them
+  // stops `dispatchable: 3` from implying that three models share the work.
+  const standby = ordered.slice(1).map(entry => ({route_id: entry.route.id, provider: entry.route.provider,
+    model: entry.route.model, effort: entry.effort}));
+  if (standby.length && !spread) warnings.push('LOWER_PRIORITY_ROUTES_IDLE_UNTIL_FAILOVER');
+  return {...base, status: 'SELECTED', route: chosen.route, effort: chosen.effort, pool: policy.pool, reason: policy.reason,
+    ...roleView(policy, task), qualification: chosen.qualification,
+    ...(independence ? {independence} : {}),
+    // The ordered remainder, each carrying the evidence that authorized it, so a failover
+    // never dispatches a route on the strength of the previous route's qualification.
+    standby, alternates: ordered.slice(1),
+    selectionOrder: spread ? 'SPREAD' : 'POOL_PRIORITY',
+    warnings, reasons};
+}
+/** Rotate the eligible list so a caller that asks for spreading does not always land on the
+ * same route. The key decides the offset, so the same key still yields the same answer:
+ * distribution without giving up a reproducible result. */
+function rotate(eligible, spread) {
+  const key = typeof spread === 'string' ? spread : String(spread);
+  let hash = 0;
+  for (let index = 0; index < key.length; index += 1) hash = (hash * 31 + key.charCodeAt(index)) >>> 0;
+  const offset = hash % eligible.length;
+  return [...eligible.slice(offset), ...eligible.slice(0, offset)];
 }
