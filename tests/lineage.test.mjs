@@ -5,6 +5,7 @@ import test, {after} from 'node:test';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import path from 'node:path';
+import {fileURLToPath} from 'node:url';
 import {makeTempRoot} from './helpers/tmp.mjs';
 import {createAgentDispatcher, reviewMaterial} from '../src/agent-dispatch.mjs';
 import {createRecordStore, keyOf} from '../src/qualification.mjs';
@@ -136,7 +137,9 @@ test('every bounded verdict field reports what storage cost it', () => {
 test('no document still claims a verdict is stored verbatim', async () => {
   // The claim was never true of a record that trims and caps, and it survived two earlier
   // attempts to remove it.
-  const base = path.join(path.dirname(new URL(import.meta.url).pathname).replace(/^\//, ''), '..');
+  // fileURLToPath, because stripping the leading slash of a URL path only produces a
+  // valid filesystem path on Windows drive letters and yields a relative path elsewhere.
+  const base = path.join(path.dirname(fileURLToPath(import.meta.url)), '..');
   for (const file of ['README.md', path.join('src', 'verdict.mjs'), path.join('docs', 'DESIGN-NOTES.md')]) {
     const text = await fs.readFile(path.join(base, file), 'utf8');
     assert.equal(/(stored|recorded) verbatim/.test(text), false, `${file} still claims verbatim storage`);

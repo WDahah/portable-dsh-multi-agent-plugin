@@ -199,7 +199,7 @@
     },
     {
       "path": "tests/lineage.test.mjs",
-      "sha256": "78f40ff65e68ebe2fde8340a486dabcaf021ba1de6da828ff42a2d0aee090aa5"
+      "sha256": "1ab3cad41aa569d2969c11f95ee4a6c2fd95eb6507584abeeac3f6c391feb77e"
     },
     {
       "path": "tests/loop.test.mjs",
