@@ -82,6 +82,10 @@
       "sha256": "74f2a1d19b3269881efa8680f82d50a4e84d5398dae63caea6add2eeeeef2ae9"
     },
     {
+      "path": "docs/GOVERNANCE.md",
+      "sha256": "c2a79a3f37fc597a070d3b825cddfd1b7c9bbe853e1e822b01aa527aa5bb96d5"
+    },
+    {
       "path": "docs/SECURITY-AND-LIMITS.md",
       "sha256": "9515fe63aed551093047d531e78964c7a4acdc6cb202b8e530a7fc317fac35a1"
     },
@@ -98,6 +102,10 @@
       "sha256": "8be1d9682ad1a56dcece87cc70857a27c4fbb9c56aa24c70871770a8c34ca13e"
     },
     {
+      "path": "examples/governance-policy.json",
+      "sha256": "00274669d1f6280610a84b13dae8ff150209da9bd1ff294c3a5c103c71520ed1"
+    },
+    {
       "path": "examples/host-patch.example.yml",
       "sha256": "1984ef6c9aed148fc9e0c281eebb397b3bd9868b9ec1e6f1da7de01d18d49f21"
     },
@@ -107,15 +115,27 @@
     },
     {
       "path": "package.json",
-      "sha256": "bdde1dabae50057767364342eb7c637d011981efb2d8a7022b55bd0186fef2af"
+      "sha256": "988db8e253a33958e65cbb764f60fed81dab6f6dfabc7d93df7447adc19d9801"
+    },
+    {
+      "path": "scripts/doctor-governance.mjs",
+      "sha256": "633da7e8cf3109f3b6205171fa7c4c5643fbc57287c1f2462a06e5f8e0a9aec9"
     },
     {
       "path": "scripts/doctor.mjs",
       "sha256": "11e6635eb6a43af6faac8ee9e7e3a4563037926cf39992e79313088d75b636e0"
     },
     {
+      "path": "scripts/governance-acceptance.mjs",
+      "sha256": "a48de1230cd3f8d77cb3c4269a11994c3bbac7cd14b85666c0470eed331e2159"
+    },
+    {
       "path": "scripts/manifest.mjs",
       "sha256": "1557b04f7893331c3771f4e3e7554c62d738ab9c7a77e60f7e265c7c3b1b1075"
+    },
+    {
+      "path": "scripts/setup-governance.mjs",
+      "sha256": "6eb81c7a521564f3f9f5cb5a10e03cd0fb681824e3cd520a8cb2cde8c0218e86"
     },
     {
       "path": "scripts/setup.mjs",
@@ -127,7 +147,7 @@
     },
     {
       "path": "src/agent-dispatch.mjs",
-      "sha256": "c03089b3b3b1d1f62a3ff9cf5837af649963fc09734a1486953f1515de51ad7a"
+      "sha256": "6790c12f01702ad0c62e547cc60253f68c1c1557e0d872ebdbf574b2a62c0753"
     },
     {
       "path": "src/batch.mjs",
@@ -142,12 +162,48 @@
       "sha256": "6a47af7c8105b1c02eb1dd5531808e9fe57227edb162661f5f172298ae6e7794"
     },
     {
+      "path": "src/governance/contracts.mjs",
+      "sha256": "5a2a573a240fb7512fea69dc3c5ca25ca6a613212aa9d6e9a017ecc099ff2969"
+    },
+    {
+      "path": "src/governance/controller.mjs",
+      "sha256": "45ffe92eef09df445d7668f508fc1a0b1b11145f66c307e9adbd3055ceb4304f"
+    },
+    {
+      "path": "src/governance/delivery.mjs",
+      "sha256": "3a7bc90348bc566c4215ee74534d8e2bf58000936f8869f2ebe261f292e8dc00"
+    },
+    {
+      "path": "src/governance/host.mjs",
+      "sha256": "ddfb2c8adacb1fb012724aa1041765e7a74a8d2f3025bf80af9f84298f150b98"
+    },
+    {
+      "path": "src/governance/plugin.mjs",
+      "sha256": "ef00ce7afbe2eaf2fbe543fbb8baff9b1a20b9fa7b519402ce65561ce76548cc"
+    },
+    {
+      "path": "src/governance/policy.mjs",
+      "sha256": "aa1f0d6967b8232066eb244cfcad033f3e511ff2e8a912b0de8bdebbef05c4ee"
+    },
+    {
+      "path": "src/governance/runner.mjs",
+      "sha256": "06f1d38e2398a54ade93fa55b2350f4a915079778f539d5105f0bfcfdea18eea"
+    },
+    {
+      "path": "src/governance/store.mjs",
+      "sha256": "2a416c9931b5c505c9208c277378ed30f6c0e00ce9cd1a068447156da78cb470"
+    },
+    {
+      "path": "src/governance/workspace.mjs",
+      "sha256": "36cafad97839c7b5c3ac7597c9f4ab514cf204666b236b1c0f823d9088df783c"
+    },
+    {
       "path": "src/journal.mjs",
       "sha256": "fb46cbf9ba7efd31e41aa5cc30e37744b36573d89cec4cfb6abd732f29ba87e9"
     },
     {
       "path": "src/plugin.mjs",
-      "sha256": "4ec8c35769f225efb6f86864db54d2db72b71b2b1f598aa62383549ad61c0f0b"
+      "sha256": "6bcdc3272f768e75141eabcce49b9cd575a8149c0c36bb328c29615318c84c2d"
     },
     {
       "path": "src/probes.mjs",
@@ -191,7 +247,7 @@
     },
     {
       "path": "tests/diagnostic.test.mjs",
-      "sha256": "9e52eecdfcec6eb82b11be248e6a4fe7a0567e0ae3ae2c7f341c94edff5c4f3e"
+      "sha256": "77ad96fa32a21837b52e24a39dde8af8f07107d836bcfd866f09324f369c9b59"
     },
     {
       "path": "tests/dispatch-concurrency.test.mjs",
@@ -212,6 +268,46 @@
     {
       "path": "tests/evidence.test.mjs",
       "sha256": "558c068bdf81ff03e7f6db9661ae42e00f21cabfc86c5c4c7cd6929c36238b92"
+    },
+    {
+      "path": "tests/governance-contracts.test.mjs",
+      "sha256": "959a34655110f9097a50889c5500133e80f834e965bee73d22f64a67ddda357c"
+    },
+    {
+      "path": "tests/governance-delivery.test.mjs",
+      "sha256": "66d84d964fc3925e434ded35c2a8285a3c427bd8bd03361d057216fee09a6459"
+    },
+    {
+      "path": "tests/governance-host.test.mjs",
+      "sha256": "889fd7e5298f995599301420366473071cf5bd5f8c698745f141de9f1282d430"
+    },
+    {
+      "path": "tests/governance-policy.test.mjs",
+      "sha256": "9033a886424715c4a7ca26a3f5e610e644d668534cd588f3c78d9091d7829c7a"
+    },
+    {
+      "path": "tests/governance-recovery.test.mjs",
+      "sha256": "dd1ece017c2d662e56eeaf755e8770db04fcc9f9222a6bb96d0f82050ce30d98"
+    },
+    {
+      "path": "tests/governance-runner.test.mjs",
+      "sha256": "d0b301baa502e18e8e434e56f239146691e5d0f08a0bac475bb954585dbcced8"
+    },
+    {
+      "path": "tests/governance-six-stage.test.mjs",
+      "sha256": "456c645126c270bf8691c369687728cd91f011f40ca70ac4b4c7db88352b3707"
+    },
+    {
+      "path": "tests/governance-state.test.mjs",
+      "sha256": "c0477d5be1b824b498675b190aad489f19e37820f9e1fd07a7d68dca355e24a0"
+    },
+    {
+      "path": "tests/governance-workspace.test.mjs",
+      "sha256": "98e64bf626862c1b7eb7e74aec3ddd2ce52b03a17b4c444ed54bd7c0a01ee36e"
+    },
+    {
+      "path": "tests/helpers/governance.mjs",
+      "sha256": "225f2cdba88b013a57b93589f32cc3c7ceee6473c75ba8c06ca835c52e453515"
     },
     {
       "path": "tests/helpers/tmp.mjs",
@@ -251,7 +347,7 @@
     },
     {
       "path": "tests/setup.test.mjs",
-      "sha256": "e85a9c237913cc5c3bd8ef40abf1ae42e7664bea14c6ab36eb0f6d223eb2e4fd"
+      "sha256": "a954f040fe6c6eaa82c8ca7c86ee02da4eb8d69c6243d8ab114a91d67b1d9e1f"
     },
     {
       "path": "tests/state-management.test.mjs",

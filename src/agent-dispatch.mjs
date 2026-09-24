@@ -132,8 +132,8 @@ function ownChild(child, signal) {
     } finally {signal.removeEventListener('abort', abort);}
   }};
 }
-export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 900000}) {
-  need(Number.isSafeInteger(deadlineMs) && deadlineMs > 0 && deadlineMs <= 900000, 'INVALID_DEADLINE');
+export function createAgentDispatcher({root, owner, getSubagents, deadlineMs = 2500000}) {
+  need(Number.isSafeInteger(deadlineMs) && deadlineMs > 0 && deadlineMs <= 2500000, 'INVALID_DEADLINE');
   const store = createRecordStore(root, owner, 'assignments'), admission = createAdmission(deadlineMs);
   let disposed = false;
   const id = value => {need(typeof value === 'string' && /^[A-Za-z0-9_-]{1,64}$/.test(value), 'INVALID_RUN_ID'); return keyOf(value);};

@@ -94,6 +94,7 @@ test('synthetic two-round success has exact known accounting and portable factor
   createPlugin(definition => definition).apply(ctx, {stateRoot: await root()});
   t.after(() => {for (const dispose of disposers.reverse()) dispose();});
   for (const name of ['orchestrator_inventory', 'orchestrator_plan', 'orchestrator_read']) assert.equal(definitions.get(name).timeoutMs, 60000);
-  for (const name of ['orchestrator_run', 'orchestrator_resume', 'orchestrator_delegate']) assert.equal(definitions.get(name).timeoutMs, 910000);
+  for (const name of ['orchestrator_run', 'orchestrator_resume']) assert.equal(definitions.get(name).timeoutMs, 910000);
+  assert.equal(definitions.get('orchestrator_delegate').timeoutMs, 2510000);
   assert.equal(definitions.get('orchestrator_qualify').timeoutMs, 190000);
 });

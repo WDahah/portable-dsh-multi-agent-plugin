@@ -19,6 +19,7 @@
   },
   "scripts": {
     "test": "node --test",
+    "test:governance": "node --test --test-concurrency=1 tests/governance-six-stage.test.mjs tests/governance-state.test.mjs",
     "setup": "node scripts/setup.mjs",
     "doctor": "node scripts/doctor.mjs",
     "verify": "node scripts/verify.mjs",

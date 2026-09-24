@@ -136,7 +136,7 @@ export function createPlugin(defineTool) {
             // says so rather than leaving a reader to assume it.
             grounds: selected.grounds, routing_provenance: 'SELECTOR'},
           selected.route, selected.effort, exec)};
-      }, 910000);
+      }, 2510000);
     register('orchestrator_delegate_read', 'Read immutable child-assignment output; never restarts the child.',
       {run_id: {type: 'string', required: true}, offset: {type: 'integer'}}, (args, exec) => owned(exec).agents.read(args.run_id, args.offset ?? 0));
     register('orchestrator_batch', 'Run 2–8 independent read-only tasks with at most two workers. Collect bounded findings without a synthesis call; native usage remains unknown. No retries, failover or writes.',
@@ -246,7 +246,7 @@ export function createPlugin(defineTool) {
           // applied, so a caller can see what the cheap call bought.
           ...(args.compact === true ? {compactions, compactorAvailable: compactor?.status === 'SELECTED'} : {}),
           note: 'Verdicts are recorded as declared. The loop never judged the work itself.'};
-      }, 910000);
+      }, 2510000);
     register('orchestrator_capacity', 'Report which routes can be dispatched right now, per pool, with the providers they span and the exact probe that would fix anything unusable. Reads recorded evidence only; makes no provider call.',
       {}, async (_args, exec) => {
         const entry = owned(exec), records = await entry.qualifications.list(), now = Date.now();
