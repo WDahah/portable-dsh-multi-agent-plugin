@@ -291,7 +291,7 @@
     },
     {
       "path": "tests/governance-runner.test.mjs",
-      "sha256": "689cc8e8e4b8639e2e269bf35413210a36f0f03d435af0ea1754d280ce4bc6c1"
+      "sha256": "658df092620c89a6f7203fb172c90775dbe73686e174f2d552a43f3df203c0ba"
     },
     {
       "path": "tests/governance-six-stage.test.mjs",
@@ -307,7 +307,7 @@
     },
     {
       "path": "tests/helpers/governance.mjs",
-      "sha256": "391af23f961f577ec82568d773fb3b43d7a355bbf7ae52344e29545180c75cad"
+      "sha256": "9801cb3cc2d6db40ee1aec9481491f18f41bd394378ecb430d4b4125671c5776"
     },
     {
       "path": "tests/helpers/tmp.mjs",

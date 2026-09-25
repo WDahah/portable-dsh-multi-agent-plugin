@@ -6,10 +6,12 @@ import * as syncFs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import {createHash} from 'node:crypto';
-import {spawn} from 'node:child_process';
+import {spawn,spawnSync} from 'node:child_process';
 import {once} from 'node:events';
 import {createPinnedRunnerV2,checkPinnedTapV2,checkProbeTap} from '../src/governance/runner.mjs';
 import {digest,bindingForV2} from '../src/governance/contracts.mjs';
+// The pinned runner passes --test-isolation=none, which Node 22 accepts only as --experimental-test-isolation.
+const realRunnerNode={skip:spawnSync(process.execPath,['--test-isolation=none','-e','0'],{stdio:'ignore'}).status===0?false:'this Node does not accept --test-isolation'};
 
 const rawHash = value => createHash('sha256').update(value).digest('hex');
 const nodeHash = rawHash(await fs.readFile(process.execPath));
@@ -302,31 +304,31 @@ async function realSubprocessFixture(t,f) {
   }};
 }
 
-test('M3 real fixed Node flat-TAP program qualifies only after actual close',async t => {
+test('M3 real fixed Node flat-TAP program qualifies only after actual close',realRunnerNode,async t => {
   const f = await fixture(t), subprocess = await realSubprocessFixture(t,f), runner = f.make({subprocess});
   const fact = await f.facts(runner);assert.equal(fact.timedOut,false);assert.equal(fact.aborted,false);assert.equal(fact.signal,null);
   assert.equal(fact.actualExit,0);assert.equal(fact.status,'completed');assert.equal(checkPinnedTapV2(fact.stdoutChunks.join(''),['owned-case']),true);
 });
 
-test('M3 real imported trusted candidate and reviewed protected test bind the replica',async t => {
+test('M3 real imported trusted candidate and reviewed protected test bind the replica',realRunnerNode,async t => {
   const imported = "import test from 'node:test';import assert from 'node:assert/strict';import {value} from './candidate.mjs';test('owned-case',()=>assert.equal(value,4));\n";
   const f = await fixture(t,{program:imported}), subprocess = await realSubprocessFixture(t,f), fact = await f.facts(f.make({subprocess}));
   assert.equal(fact.timedOut,false);assert.equal(fact.aborted,false);assert.equal(fact.status,'completed');
 });
 
-test('M3 real Node assertion failure records complete ASCII failure, never a pass',async t => {
+test('M3 real Node assertion failure records complete ASCII failure, never a pass',realRunnerNode,async t => {
   const f = await fixture(t,{program:program.replace('2+2,4','2+2,5')}), subprocess = await realSubprocessFixture(t,f), fact = await f.facts(f.make({subprocess}));
   assert.equal(fact.timedOut,false);assert.equal(fact.aborted,false);assert.notEqual(fact.actualExit,0);assert.equal(fact.status,'failed');
   assert.match(fact.stdoutChunks.join(''),/not ok 1 - owned-case/);
 });
 
-test('M3 real early exit program cannot invent complete TAP inventory',async t => {
+test('M3 real early exit program cannot invent complete TAP inventory',realRunnerNode,async t => {
   const f = await fixture(t,{program:"process.stdout.write('TAP version 13\\nok 1 - owned-case\\n');process.exit(0);\n"});
   const subprocess = await realSubprocessFixture(t,f), fact = await f.facts(f.make({subprocess}));
   assert.equal(fact.timedOut,false);assert.equal(fact.aborted,false);assert.equal(fact.actualExit,0);assert.equal(fact.status,'failed');
 });
 
-test('M3 real non-ASCII output is diagnostic-only rather than alleged raw UTF-8 evidence',async t => {
+test('M3 real non-ASCII output is diagnostic-only rather than alleged raw UTF-8 evidence',realRunnerNode,async t => {
   const f = await fixture(t,{program:program+"console.log('é');\n"}), subprocess = await realSubprocessFixture(t,f), fact = await f.facts(f.make({subprocess}));
   assert.equal(fact.timedOut,false);assert.equal(fact.aborted,false);assert.equal(fact.status,'failed');assert.equal(fact.captureComplete,false);assert.equal(fact.stdoutDigest,null);
 });

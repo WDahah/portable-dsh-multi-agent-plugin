@@ -133,7 +133,9 @@ export function m2Deferred(){
   promise.catch(()=>{});return {promise,resolve,reject,get settled(){return settled;}};
 }
 async function m2GitPath(){
-  const candidates=process.platform==='win32'?[path.join(process.env.ProgramFiles??'C:\\Program Files','Git','cmd','git.exe')]:['/usr/bin/git','/usr/local/bin/git'];
+  // macOS /usr/bin/git reports "git version 2.x (Apple Git-N)", which the workspace version
+  // pin refuses; prefer an upstream Git (Homebrew) where one is installed.
+  const candidates=process.platform==='win32'?[path.join(process.env.ProgramFiles??'C:\\Program Files','Git','cmd','git.exe')]:process.platform==='darwin'?['/opt/homebrew/bin/git','/usr/local/bin/git','/usr/bin/git']:['/usr/bin/git','/usr/local/bin/git'];
   for(const candidate of candidates){try{const st=await m1fs.stat(candidate);if(st.isFile())return await m1fs.realpath(candidate);}catch(e){if(e.code!=='ENOENT')throw e;}}
   throw new Error('M2 fixture requires an absolute installed Git executable');
 }
