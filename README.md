@@ -8,13 +8,23 @@
 
 **Route tasks, run scoped agents, collect parallel findings, and record structured reviews—with explicit limits and durable history.**
 
+Adding a second agent is easy. Knowing which agent did what, with which tool, under which policy, and when it must stop is the hard part. Multi-agent gives your DSH harness that coordination layer as fifteen native tools, with no dependencies to install. v1.14 also adds an opt-in **governance gate**: a six-stage, human-authorized path from plan to reviewed candidate.
+
+- **One accountable supervisor.** Workers get a scoped prompt and a tool allowlist, and can't delegate further.
+- **Evidence before dispatch.** A route is used only after a fresh live qualification in your own session.
+- **Defined stopping points.** Round caps, review-cycle caps, deadlines and author-attempt budgets are fixed in advance.
+- **A traceable record.** Every assignment keeps its route, model, prompt, output and failure state.
+
 This is a native plugin for a compatible **DeepSeek Harness (DSH)/Cordis host**, not a standalone framework or hosted service. It selects routes from fresh session-scoped smoke evidence, runs bounded work, and records prompts, results, model identity and failure states. A reviewer declares whether work passed; the plugin follows that declaration, not its own judgment of the answer.
 
 **Multi-agent does not automatically save tokens.** In the [27-trial benchmark](docs/BENCHMARK.md), parallel workers plus integration consumed **92.2% more tokens than one agent**. They were **23.5% faster than the same workers run sequentially**, but slower than one agent. Use delegation for useful separation of work—not an assumed token discount.
 
 ## Contents
 
+- [Why a control plane](#why-a-control-plane)
 - [Features](#features)
+- [New: governance gate](#new-governance-gate)
+- [Mandatory conditions](#mandatory-conditions)
 - [Does it save tokens?](#does-it-save-tokens)
 - [Try it without a host](#try-it-without-a-host)
 - [Requirements and installation](#requirements-and-installation)
@@ -24,6 +34,22 @@ This is a native plugin for a compatible **DeepSeek Harness (DSH)/Cordis host**,
 - [Limits and safety](#limits-and-safety)
 - [Validation and development](#validation-and-development)
 - [Documentation](#documentation)
+
+## Why a control plane
+
+Rod Trent's [*Multi-Agent Systems and Orchestration: The Hard Problem Is Coordination*](https://rodtrent.substack.com/p/multi-agent-systems-and-orchestration) argues that orchestration is architecture, not a prompt. It lists seven things a coordination layer must specify on purpose. This plugin's answer to each:
+
+| Requirement | How Multi-agent handles it |
+|---|---|
+| **Endpoints and contracts** | Each call carries a typed `task` object, an explicit prompt and a tool allowlist. Refusals return a named reason, such as `MISSING_EXACT_QUALIFICATION`. |
+| **Topology** | A star: the parent supervises and children have delegation depth one. No peer mesh, so every decision can be traced back through the parent. |
+| **Authority** | Reviewers *declare* verdicts; the plugin records them and doesn't judge the work. In the governance gate, only a human can authorize a plan, and model output can't. |
+| **State** | Durable per-owner journals for assignments, batches, qualifications and direct tasks, readable without calling a model. Chat history isn't the system of record. |
+| **Aggregation** | Explicit, not hidden: batches return findings in request order, and you add an integration step yourself and count its cost. |
+| **Termination** | `max_rounds`, at most three review/revise cycles, per-call deadlines, 24-hour qualification expiry, and three author attempts in the governance gate. |
+| **Failure policy** | Uncertain work is never replayed automatically. Failover is opt-in and only for pre-dispatch refusals. `needs-clarification` and contradictory verdicts stop the loop and hand back to you. |
+
+The article's practical advice is also built in: keep workers narrow, prefer deterministic scaffolding (a fixed stage order in the gate), record every handoff, and keep a human at the points that need judgment.
 
 ## Features
 
@@ -47,6 +73,74 @@ Batch workers share **two native execution slots** with ordinary delegations and
 Workers use only `read`, `glob` and `grep`, with one delegated round each. They return a short summary, at most five findings with evidence, and up to three uncertainties. A delegated round may contain several model/tool steps. Batch workers have no automatic continuation, failover or compaction. **The batch does not include an integration call**; add one explicitly if you need a combined answer and count its cost.
 
 Slots stay occupied until child results and disposal settle, even after cancellation. Saved batch IDs cannot be replayed; unfinished recovered batches report `INTERRUPTED_UNKNOWN`. [Full batch behavior and limits →](docs/USAGE.md#parallel-read-only-batches)
+
+Native `orchestrator_delegate` and `orchestrator_iterate` calls may now run for up to **2,500,000 ms (about 42 minutes)**, up from 15 minutes, so longer reviews can finish. This is a ceiling, not a typical duration: a short delegation usually returns in seconds.
+
+## New: governance gate
+
+The governance gate is a separate, **opt-in** entry for work that needs a person to sign off at each step. It turns one configured job into a fixed six-stage sequence, and each stage must be requested by a human:
+
+```text
+open → plan-review → human authorization → author → seal → validate → review
+```
+
+- **Human commands in the chat box.** In the dedicated host, the operator types `/gov-status`, `/gov-open`, `/gov-stage`, `/gov-authorize` and the other commands directly into the DSH Web GUI. The input box shows a hint with each command's arguments. Model output, copied text or a nested model call can't authorize anything.
+- **Independent checks.** The plan is reviewed before any author runs. The author's candidate is sealed byte-for-byte, then validated with pinned trusted tests and reviewed separately.
+- **A hard attempt budget.** Three author attempts in total: the first plus two corrections. Nothing refunds an attempt, including pause, restart or a new workspace.
+- **Same-owner pause and resume.** `/gov-pause` returns a one-time checkpoint; `/gov-resume <checkpoint> author` consumes it exactly once.
+- **Bounded, read-only diagnostics.** `/gov-read` pages status, history, evidence and artifacts at no more than 16 KiB per reply. It isn't a file reader.
+- **Qualification and offline acceptance.** `/gov-accept`, `/gov-qualify` and `/gov-export` in the disposable qualification host produce receipts. Every receipt carries `qualificationOnly:true`, `operationallyAccepted:false` and `gateActive:false`.
+
+### Example: one job from plan to export
+
+A walkthrough typed by hand in the receiver session. Each line is sent as its own message, and the digests are shortened here. Copy the real values from the reply to the step before; each reply names the next allowed step.
+
+| You type | What happens | Key field in the reply |
+|---|---|---|
+| `/gov-status` | Reads the job before anything starts | `gateActive:false` |
+| `/gov-open <projectId> <planDigest>` | Opens the one configured project and plan | `headAuthenticity:"live-verified"` |
+| `/gov-stage plan-review` | An independent reviewer checks the plan | `phase:"AWAITING_HUMAN"`, `resultId` |
+| `/gov-authorize <planDigest> <resultId> authorize` | You approve this exact plan | the plan-review result becomes a human decision |
+| `/gov-stage author` | The author writes a candidate (uses 1 of 3 attempts) | `phase:"AUTHORING"` |
+| `/gov-stage seal` | The candidate's exact bytes are frozen | `candidateDigest:"1422…"` |
+| `/gov-stage validate` | Pinned trusted tests run against the sealed bytes | `outcome:"completed-pass"` |
+| `/gov-stage review` | A separate reviewer judges the candidate | `phase:"DIAGNOSTIC_READY"` |
+| `/gov-accept <candidateDigest> <headDigest>` | Records an offline acceptance, with no activation | `acceptanceRecorded:true` |
+| `/gov-qualify <candidateDigest> <newHeadDigest>` | Rechecks everything and issues a receipt | `qualificationReceiptDigest:"4cce…"` |
+| `/gov-export <receiptDigest> <destinationId>` | Copies the candidate once to the fixed destination | `deliveryPhase:"completed"` |
+| `/gov-export …` (same line again) | The replay is refused | `reason:"DELIVERY_NOT_AUTHORIZED"` |
+| `/gov-stop` | Revokes admission and shuts the owner down | — |
+
+Accept and qualify each add an event, so read the current `headDigest` with `/gov-status` before the next step. Every step can refuse with a named `reason`, and nothing moves forward on its own. The export folder then contains exactly `payload/`, `descriptor.json`, `qualification-receipt.json` and `complete.json`. The repository you're working in is never modified.
+
+Two common mistakes:
+- **Commands sent in a new session.** Type the commands in the receiver session, not a **New Session**. Anywhere else they are refused with `M4_HUMAN_RECEIVER`.
+- **Several commands in one message.** Send one command per message; several pasted together are treated as a single chat message.
+
+What it is **not**: it doesn't activate itself in your everyday harness, apply candidates to your checkout, or survive a cold restart. After process loss, a store is read-only and marked `RECONCILIATION_REQUIRED`. A walkthrough typed by hand in the stock Web GUI has been exercised in a disposable qualification host; that is qualification evidence, not operational acceptance.
+
+[Full governance guide: setup, commands, diagnostics, pause/resume and limits →](docs/GOVERNANCE.md)
+
+## Mandatory conditions
+
+Check these before you install. If one isn't met, the tools either won't appear or will refuse work.
+
+**For the orchestrator (all users):**
+
+1. **Node.js 22 or newer** and **Git**.
+2. **A running, compatible DSH/Cordis host** that provides native tools, LLM streaming and child agents. This plugin doesn't run on its own.
+3. **The host's own `dsh-tools/lib/index.js`**, passed to setup as an absolute path. Don't copy that module from another install.
+4. **Provider accounts already authenticated in the host.** No credentials are bundled.
+5. **Explicit enablement and a host restart.** The plugin is disabled by default. Add the generated patch to your *user-owned* profile, set `enabled: true`, then restart DSH. Never edit the shipped presets.
+6. **Qualification in the same root session that dispatches work.** Qualifications expire after 24 hours, and nothing transfers between sessions or machines.
+
+**For the governance gate (additionally):**
+
+1. **Windows x64 with Node 26.9.0.** This is the only guarded execution lane.
+2. **A dedicated, disposable host.** Never your everyday profile. Setup generates an inert candidate and never mounts it for you.
+3. **A reviewed configuration** with exact pins: bundle and install hashes, Node/Git/host files, stage routes, a fixed receiver ID, and six distinct canonical roots.
+4. **A restricted session policy.** `danger-full-access`, missing services or changed pins block stage admission.
+5. **A human at the keyboard.** The commands must come from the registered receiver session. Open that session by clicking it in the sidebar, not **New Session**. A brand-new session with no turns shows the Web landing page instead of command replies.
 
 ## Does it save tokens?
 
@@ -102,6 +196,16 @@ This package uses Node built-ins and has no package dependencies; **`npm install
 3. Generate and inspect the local entry and candidate host patch using your actual host module path.
 4. Back up and update the **active user-owned host composition** using its supported reload procedure. Never edit shipped presets or silently add colliding `orchestrator_*` registrations.
 5. Verify all fifteen tools are visible, then qualify needed routes in the **same root session** that will dispatch work.
+
+The core commands, from the package root:
+
+```sh
+node scripts/manifest.mjs --check
+node scripts/setup.mjs --harness-root <absolute installed DSH directory> --state-root <absolute state directory>
+node scripts/doctor.mjs
+```
+
+Then copy the `insert` entry from `.local/host-patch.yml` into your profile's `cordis.patch.yml`, set `enabled: true`, and restart DSH.
 
 Setup generates `.local/entry.mjs` and `.local/host-patch.yml`; it does not install DSH, activate the plugin or authenticate accounts. Doctor checks the local integration offline. The plugin defaults disabled until deliberately enabled in the host configuration.
 
@@ -238,6 +342,7 @@ Contributors who intentionally change packaged files must regenerate the manifes
 - [START-HERE.md](START-HERE.md) — shortest installation path.
 - [INSTALL-WITH-AI.md](INSTALL-WITH-AI.md) — scoped installation instructions for an assistant.
 - [Usage](docs/USAGE.md) — tool arguments, limits, review loops and recovery.
+- [Governance](docs/GOVERNANCE.md) — opt-in six-stage gate, human commands, diagnostics and limits.
 - [Architecture](docs/ARCHITECTURE.md) — host integration and persistence.
 - [Security and limits](docs/SECURITY-AND-LIMITS.md) — permissions, spending and retained state.
 - [Benchmark](docs/BENCHMARK.md) — measured token/latency results and limitations.
