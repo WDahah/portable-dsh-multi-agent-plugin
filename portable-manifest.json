@@ -307,7 +307,7 @@
     },
     {
       "path": "tests/helpers/governance.mjs",
-      "sha256": "9801cb3cc2d6db40ee1aec9481491f18f41bd394378ecb430d4b4125671c5776"
+      "sha256": "2116f3f416a66656967e774e81091e872ab2d394a073e189437940a59cdfcb0c"
     },
     {
       "path": "tests/helpers/tmp.mjs",

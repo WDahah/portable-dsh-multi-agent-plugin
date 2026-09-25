@@ -182,6 +182,8 @@ export async function m2GitFixture(t,{files={'a.txt':'alpha\r\n','test.mjs':'// 
     const version=(await fixture.runGit(['--version'])).trim();
     fixture.git=Object.freeze({executable,sha256:m2RawHash(await m1fs.readFile(executable)),version,systemRoot});
     await fixture.runGit(['init','--initial-branch=main','.']);
+    // macOS Git writes core.precomposeunicode, which the closed repository-config allow-list refuses.
+    if(process.platform==='darwin')await fixture.runGit(['config','--unset','core.precomposeunicode']);
     for(const [relative,content] of Object.entries(files)){
       const target=path.join(paths.sourceRoot,...relative.split('/'));await m1fs.mkdir(path.dirname(target),{recursive:true});await m1fs.writeFile(target,content,{flag:'wx'});
       if(modes[relative]==='100755'&&process.platform!=='win32')await m1fs.chmod(target,0o755);
