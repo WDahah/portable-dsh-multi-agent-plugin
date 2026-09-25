@@ -123,6 +123,33 @@ What it is **not**: it doesn't activate itself in your everyday harness, apply c
 
 ## Mandatory conditions
 
+Every change delegated to agents follows these six stages, in order. No stage may be skipped, and the author never approves its own work.
+
+| Stage | Required output |
+|---|---|
+| **1. Assess** | Establish the actual failure, affected paths, existing behavior, and evidence. Separate confirmed defects from unknowns. |
+| **2. Plan** | Specify exactly what files and behavior must change, how the fix will work, what must remain unchanged, risks, tests, acceptance criteria, and recovery steps. |
+| **3. Review the plan** | An independent reviewer checks correctness, scope, safety, and whether the proposed tests can establish the intended result. Resolve blocking findings before implementation. |
+| **4. Implement** | Delegate only the reviewed changes within the named file scope. No opportunistic fixes or expanding the assignment. |
+| **5. Validate and review** | An independent validator executes the required tests; a separate reviewer checks the exact resulting changes. The author cannot approve its own work. |
+| **6. Accept or stop** | Accept only the exact verified candidate. Allow at most two correction cycles against the same acceptance criteria; otherwise stop implementation and reassess. Never weaken tests to obtain a pass. |
+
+### How the governance gate enforces them
+
+The [governance gate](#new-governance-gate) turns stages 2–6 into checked steps. Stage 1 stays with you: the gate starts from a plan and cannot tell whether your assessment was right.
+
+| Stage | What the gate checks | Refusal when it's broken |
+|---|---|---|
+| 2. Plan | The plan must list the files to change with their expected hashes, the non-goals, the protected tests, the acceptance criteria and the exact test commands. Unknown or missing fields are rejected. | plan validation error |
+| 3. Review the plan | `/gov-stage plan-review` runs a reviewer who is not the planner and uses a different provider. Nothing is written until you approve with `/gov-authorize`. | `INDEPENDENCE_REQUIRED` |
+| 4. Implement | The author works only in a disposable copy, and the protected test files cannot be among the files it changes. Acceptance rechecks that nothing outside the plan changed, and export refuses any file outside the admitted set. | `PROTECTED_PATH`, `DELIVERY_EXTRA_FILE` |
+| 5. Validate and review | The candidate's bytes are sealed first. The validator runs the hash-pinned tests on those sealed bytes, and a separate reviewer judges them. Neither may be the planner or an author, the validator and the reviewer must be different agents, and the reviewer must use a different provider from the author. | `INDEPENDENCE_REQUIRED` |
+| 6. Accept or stop | `/gov-accept` and `/gov-qualify` bind to one candidate digest. The correction limit is fixed at 2 (3 author attempts in total); after that the job moves to `REASSESS_REQUIRED`. Test files are pinned by hash, so they can't be weakened. | `INVALID_BUDGET`, `REASSESS_REQUIRED` |
+
+Without the gate, these stages are still the rule for how you use the orchestrator tools: plan, then `orchestrator_delegate` with the `review` role for the plan, one scoped implementation delegate, then separate validation and review delegates.
+
+### Requirements to run
+
 Check these before you install. If one isn't met, the tools either won't appear or will refuse work.
 
 **For the orchestrator (all users):**

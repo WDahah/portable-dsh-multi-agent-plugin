@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {nativeTmpdir} from './helpers/tmp.mjs';
 import assert from 'node:assert/strict';
 import * as fs from 'node:fs/promises';
 import path from 'node:path';
@@ -117,7 +118,7 @@ import * as wsFs from 'node:fs/promises';
 import wsPath from 'node:path';
 import wsOs from 'node:os';
 async function wsFixture(t){
-  const root=await wsFs.mkdtemp(wsPath.join(wsOs.tmpdir(),'m4b-destination-'));t.after(()=>wsFs.rm(root,{recursive:true,force:true,maxRetries:5,retryDelay:50}));
+  const root=await wsFs.mkdtemp(wsPath.join(nativeTmpdir(),'m4b-destination-'));t.after(()=>wsFs.rm(root,{recursive:true,force:true,maxRetries:5,retryDelay:50}));
   const parent=wsPath.join(root,'parent'),protectedRoot=wsPath.join(root,'protected');await wsFs.mkdir(parent);await wsFs.mkdir(protectedRoot);
   const config={destinationId:'fixture-output',outputRoot:wsPath.join(parent,'delivery'),protectedRoots:[protectedRoot]};
   return{root,parent,protectedRoot,config};
@@ -180,7 +181,7 @@ wsTest('M4B workspace partial payload rejects extra files and preserves uncertai
 });
 
 test('M4B reassess forwards current head and retains bounded read-only admission and stop guards',async t=>{
-  const root=await fs.realpath(await fs.mkdtemp(path.join(wsOs.tmpdir(),'m4b-reassess-'))),projectRoot=path.join(root,'project'),outputRoot=path.join(root,'output');
+  const root=await fs.realpath(await fs.mkdtemp(path.join(nativeTmpdir(),'m4b-reassess-'))),projectRoot=path.join(root,'project'),outputRoot=path.join(root,'output');
   let store,owner,effects=0;t.after(async()=>{try{if(owner)await owner.close();else if(store)await store.close();}finally{await fs.rm(root,{recursive:true,force:true});}});await fs.mkdir(projectRoot);
   const destination=captureDeliveryDestinationM4B({destinationId:'reassess-output',outputRoot,protectedRoots:[projectRoot,path.join(root,'journal')]});store=await openGovernanceStoreV2({root:path.join(root,'journal'),projectRoot,protectedRoots:[]});
   const forbidden=()=>{effects++;throw new Error('Unexpected reassessment execution');};

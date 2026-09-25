@@ -1,4 +1,5 @@
 import path from 'node:path';
+import {nativeTmpdir} from './tmp.mjs';
 import os from 'node:os';
 
 /** Only offline seam fakes; live acceptance never consumes these receipts. */
@@ -11,7 +12,7 @@ export function runnerFixture({exitCode=0,stdout='',stderr='',lossy=false,quiesc
     terminate(){terminated++;},async waitForExit(){waited++;return quiescent;},
   };}};
   return {sandbox,subprocess,calls,stats:()=>({terminated,waited}),options:{
-    frozen:path.join(os.tmpdir(),'m0-frozen'),scratch:path.join(os.tmpdir(),'m0-scratch'),
+    frozen:path.join(nativeTmpdir(),'m0-frozen'),scratch:path.join(nativeTmpdir(),'m0-scratch'),
     systemRoot:path.parse(process.execPath).root,argv:[process.execPath,'-e','0'],signal:new AbortController().signal,
   }};
 }
@@ -137,7 +138,7 @@ async function m2GitPath(){
   throw new Error('M2 fixture requires an absolute installed Git executable');
 }
 export async function m2GitFixture(t,{files={'a.txt':'alpha\r\n','test.mjs':'// fixture test\n'},modes={}}={}){
-  const root=await m1fs.realpath(await m1fs.mkdtemp(path.join(os.tmpdir(),'m2-workspace-'))),resources=[];
+  const root=await m1fs.realpath(await m1fs.mkdtemp(path.join(nativeTmpdir(),'m2-workspace-'))),resources=[];
   let disposed=false,sequence=0;
   const paths=Object.fromEntries(['sourceRoot','workspaceRoot','scratchRoot','governanceRoot','legacyRoot','configRoot','siblingRoot'].map(name=>[name,path.join(root,name.replace('Root',''))]));
   const setupRoot=path.join(root,'setup'),home=path.join(setupRoot,'home'),hooks=path.join(setupRoot,'hooks'),captures=path.join(setupRoot,'captures');

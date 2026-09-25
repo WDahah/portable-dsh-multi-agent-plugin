@@ -31,7 +31,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "1664b799e43755c34ef862ed63820b5b23ee2830e6c635f9653f4f1eebe5a14c"
+      "sha256": "854b85170b2b399a91c623b44aec0c6b62ce08a79bc3a9fd8bbb834865bfdc46"
     },
     {
       "path": "CODE_OF_CONDUCT.md",
@@ -51,7 +51,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "f469754db18b95788cc1db5c0646b0203be56bfc1a8f095af80b8d9022779fc4"
+      "sha256": "8385076ddcf1b45fbf566de3bc2727094ca143010bf3012c7829df43cb9f27e2"
     },
     {
       "path": "SECURITY.md",
@@ -115,7 +115,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "988db8e253a33958e65cbb764f60fed81dab6f6dfabc7d93df7447adc19d9801"
+      "sha256": "3c8813c4b56a0aa86a00b24dbe2142503d66cd9a4da71a631c550ca241971c4f"
     },
     {
       "path": "scripts/doctor-governance.mjs",
@@ -275,11 +275,11 @@
     },
     {
       "path": "tests/governance-delivery.test.mjs",
-      "sha256": "66d84d964fc3925e434ded35c2a8285a3c427bd8bd03361d057216fee09a6459"
+      "sha256": "f063665813ade538b30c30caddcee5cb1d034cc509d7f0ed363d73b4b5171b7e"
     },
     {
       "path": "tests/governance-host.test.mjs",
-      "sha256": "889fd7e5298f995599301420366473071cf5bd5f8c698745f141de9f1282d430"
+      "sha256": "f680d2772660cf981454586b6599bb7a50ee72c741eaf999b4626ce05b1f3e2e"
     },
     {
       "path": "tests/governance-policy.test.mjs",
@@ -287,11 +287,11 @@
     },
     {
       "path": "tests/governance-recovery.test.mjs",
-      "sha256": "dd1ece017c2d662e56eeaf755e8770db04fcc9f9222a6bb96d0f82050ce30d98"
+      "sha256": "447947e8505755d21269b501e3127b88a04c84c1c9dac4247c787ca5c54ca18c"
     },
     {
       "path": "tests/governance-runner.test.mjs",
-      "sha256": "d0b301baa502e18e8e434e56f239146691e5d0f08a0bac475bb954585dbcced8"
+      "sha256": "689cc8e8e4b8639e2e269bf35413210a36f0f03d435af0ea1754d280ce4bc6c1"
     },
     {
       "path": "tests/governance-six-stage.test.mjs",
@@ -299,7 +299,7 @@
     },
     {
       "path": "tests/governance-state.test.mjs",
-      "sha256": "c0477d5be1b824b498675b190aad489f19e37820f9e1fd07a7d68dca355e24a0"
+      "sha256": "e18d47a80e44d5e5b81544373302097ab6dd9de9f898c65c51f6296a0c1da4a3"
     },
     {
       "path": "tests/governance-workspace.test.mjs",
@@ -307,11 +307,11 @@
     },
     {
       "path": "tests/helpers/governance.mjs",
-      "sha256": "225f2cdba88b013a57b93589f32cc3c7ceee6473c75ba8c06ca835c52e453515"
+      "sha256": "391af23f961f577ec82568d773fb3b43d7a355bbf7ae52344e29545180c75cad"
     },
     {
       "path": "tests/helpers/tmp.mjs",
-      "sha256": "1ce09c17887411ded987f92bdbd93b0a080edcccad58b2510345abcaecbb8352"
+      "sha256": "d0e82a4c8b114b779f2445887e0398318cc7f2a8d5191e34e1414d7c9bc091c7"
     },
     {
       "path": "tests/integrity.test.mjs",
@@ -347,7 +347,7 @@
     },
     {
       "path": "tests/setup.test.mjs",
-      "sha256": "a954f040fe6c6eaa82c8ca7c86ee02da4eb8d69c6243d8ab114a91d67b1d9e1f"
+      "sha256": "8148834434815a0efb24a147ba509d2e0a4c11781e787ca1a6ad99360c71a702"
     },
     {
       "path": "tests/state-management.test.mjs",

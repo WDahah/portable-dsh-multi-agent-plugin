@@ -8,7 +8,7 @@ import {prepareSetup, resolveToolsModule, parseArgs, assertNode} from '../script
 import {doctor} from '../scripts/doctor.mjs';
 import {verify} from '../scripts/verify.mjs';
 import {createHash} from 'node:crypto';
-import {makeTempRoot} from './helpers/tmp.mjs';
+import {makeTempRoot,nativeTmpdir} from './helpers/tmp.mjs';
 
 // Explicit synthetic host/factory fixtures: no real host application or provider calls.
 async function fixture(t) {
@@ -134,7 +134,7 @@ import {openGovernanceStoreV2} from '../src/governance/store.mjs';
 const m4Hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const m4Deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};};
 async function m4Fixture(t){
-  const root=await fs.mkdtemp(path.join(os.tmpdir(),'m4-setup-'));t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:5,retryDelay:50}));
+  const root=await fs.mkdtemp(path.join(nativeTmpdir(),'m4-setup-'));t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:5,retryDelay:50}));
   const bundle=path.join(root,"bundle space ü '"),install=path.join(root,'installed host'),outputRoot=path.join(root,'candidate output');
   await fs.mkdir(path.join(bundle,'src','governance'),{recursive:true});await fs.mkdir(install);
   const plugin="export function createGovernancePluginM4(defineTool){if(typeof defineTool!=='function')throw Error('missing tool');return {name:'synthetic-governance',apply(_ctx,config){if(config.role==='preset')return;throw Error('fixture never starts host');}};}\n";
@@ -167,7 +167,7 @@ async function m4Tree(root){
   await walk(root);return rows.sort((a,b)=>a.path.localeCompare(b.path));
 }
 async function m4Cli(t,argv){
-  const root=await fs.mkdtemp(path.join(os.tmpdir(),'m4-doctor-cli-'));t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:5,retryDelay:50}));
+  const root=await fs.mkdtemp(path.join(nativeTmpdir(),'m4-doctor-cli-'));t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:5,retryDelay:50}));
   const out=path.join(root,'stdout'),err=path.join(root,'stderr'),stdout=m4fs.openSync(out,'wx'),stderr=m4fs.openSync(err,'wx');let child,timedOut=false;
   try{
     child=m4spawn(process.execPath,argv,{stdio:['ignore',stdout,stderr],windowsHide:true});

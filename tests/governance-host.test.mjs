@@ -107,6 +107,14 @@ test('doctor is read-only and cannot turn claimed receipts into approval',async 
 
 
 import {createHumanDecisionPortV2,createStageHostV2} from '../src/governance/host.mjs';
+// The governance host runs only on Windows x64 with Node 26.9.0 and refuses every other
+// runtime at startup. Tests that start it are skipped elsewhere; the refusal is tested instead.
+const supportedHost=process.platform==='win32'&&process.arch==='x64'&&process.versions.node==='26.9.0';
+const onlySupportedHost={skip:supportedHost?false:'governance host requires Windows x64 with Node 26.9.0'};
+const onlyWindows={skip:process.platform==='win32'?false:'fixture uses Windows roots and SYSTEMROOT'};
+test('M3 host refuses to start outside the supported runtime',{skip:supportedHost?'supported runtime':false},()=>{
+  assert.throws(()=>createStageHostV2({get:n=>({agents:{},tools:{},llm:{}})[n],on:()=>()=>{},effect:fn=>fn()},{root:process.cwd()}),{code:'V2_UNSUPPORTED_HOST'});
+});
 test('M3 command port pins normalized resolved definition, live receiver and non-model origin',async()=>{
   const receiver={id:'human'},effects=[];let current,initiator,live=true,handler,count=0;
   const commands={register(def){current=Object.freeze({...def});handler=current.handler;return()=>{current=undefined;};},find:()=>current};
@@ -120,7 +128,7 @@ test('M3 command port pins normalized resolved definition, live receiver and non
   await assert.rejects(handler({...inv,rawInput:inv.rawInput+' true'}),{code:'V2_HUMAN_INPUT'});
   live=false;await assert.rejects(handler(inv),{code:'V2_HUMAN_RECEIVER'});assert.equal(count,1);port.close();for(const d of effects)d();
 });
-test('M3 host missing capabilities and fabricated run cannot create authority',async()=>{
+test('M3 host missing capabilities and fabricated run cannot create authority',onlySupportedHost,async()=>{
   assert.throws(()=>createStageHostV2({get:()=>undefined},{root:process.cwd()}),{code:'V2_HOST_PREREQUISITES'});
   let disposed=0;const effects=[];const host=createStageHostV2({get:n=>({agents:{},tools:{},llm:{}})[n],on:()=>()=>disposed++,effect:fn=>effects.push(fn())},{root:process.cwd()});
   await assert.rejects(host.observe({}),{code:'V2_UNKNOWN_RUN'});await assert.rejects(host.cancel({}),{code:'V2_UNKNOWN_RUN'});
@@ -139,7 +147,7 @@ function m4HostConfig(root,host){
   const plan={schemaVersion:2,jobId:'m4-host-unit',projectId:m4HostDigest(roots.project.toLowerCase()),baseline:'b'.repeat(64),objective:'M4 host controls',nonGoals:[],files:[{path:'candidate.mjs',operation:'replace',expectedHash:'c'.repeat(64)}],protectedTests:['fixed.test.mjs'],criteria:[{id:'M4_VALUE',description:'fixed control',method:'test'}],commands:[{id:'fixed',executable:node.executable,argv:['--test','--test-isolation=none','--test-reporter=tap','fixed.test.mjs'],cwd:'frozen',environment:{SYSTEMROOT:node.systemRoot},timeoutMs:10000,expectedExit:0,inventory:['M4_VALUE']}],policy:{planner:{id:'planner',provider:'author'},implementerProvider:'author',correctionLimit:2},testInventory:['M4_VALUE'],environmentDigest:m4HostDigest({node,enforcement:executionPolicy.enforcement,environmentRecipe:executionPolicy.environmentRecipe}),executionPolicy};
   return{role:'host',schemaVersion:1,mode:'diagnostic',roots,presetId:'governed-preset',receiverId:'m4-receiver',toolchain:{git:{executable:host,sha256:'a'.repeat(64),version:'git version 2.55.0.windows.5'},host:{executable:host,sha256:'a'.repeat(64)}},plan};
 }
-test('M4 pure config is closed, disjoint and exact-project bound without allocating roots',async t=>{
+test('M4 pure config is closed, disjoint and exact-project bound without allocating roots',onlyWindows,async t=>{
   const root=await makeTempRoot('m4-host-config-'),config=m4HostConfig(root,path.join(root,'host.mjs'));t.after(()=>fs.rm(root,{recursive:true,force:true}));
   assert.equal(validateGovernanceConfigM4(config).mode,'diagnostic');
   for(const mutate of [c=>c.extra=true,c=>c.mode='enabled',c=>c.roots.scratch=c.roots.project,c=>c.roots.config=path.join(c.roots.project,'config'),c=>c.plan.projectId='d'.repeat(64),c=>c.presetId='standard',c=>c.toolchain.git.extra=true,c=>c.receiverId='../reset',c=>c.plan.executionPolicy.node.version='20.0.0']){
@@ -147,7 +155,7 @@ test('M4 pure config is closed, disjoint and exact-project bound without allocat
   }
   assert.deepEqual(await fs.readdir(root),[]);
 });
-test('M4 pin verifier retains identities and refuses changed or linked control roots',async t=>{
+test('M4 pin verifier retains identities and refuses changed or linked control roots',onlySupportedHost,async t=>{
   const root=await makeTempRoot('m4-host-pins-'),host=path.join(root,'host.mjs');t.after(()=>fs.rm(root,{recursive:true,force:true}));await fs.writeFile(host,'// pinned host fixture\n');
   const c=m4HostConfig(root,host);c.plan.executionPolicy.node.systemRoot=await fs.realpath(process.env.SYSTEMROOT);c.plan.commands[0].environment.SYSTEMROOT=c.plan.executionPolicy.node.systemRoot;for(const k of ['project','scratch','legacy','config'])await fs.mkdir(c.roots[k]);
   c.toolchain.host.sha256=m4HostHash(await fs.readFile(host));c.toolchain.git.sha256=c.toolchain.host.sha256;c.plan.executionPolicy.node.sha256=m4HostHash(await fs.readFile(process.execPath));c.plan.environmentDigest=m4HostDigest({node:c.plan.executionPolicy.node,enforcement:c.plan.executionPolicy.enforcement,environmentRecipe:c.plan.executionPolicy.environmentRecipe});
@@ -225,7 +233,7 @@ async function m4LifecycleFixture(t,{holdCreation=false,holdDisposal=false}={}){
     start(){start=startGovernanceM4(ctx,config);start.then(value=>{owner=value;},()=>{});return start;}};
 }
 
-test('M4 close during pending receiver creation drains and disposes the late handle exactly once',async t=>{
+test('M4 close during pending receiver creation drains and disposes the late handle exactly once',onlySupportedHost,async t=>{
   const f=await m4LifecycleFixture(t,{holdCreation:true}),starting=f.start();
   await Promise.race([f.createEntered.promise,starting.then(()=>{throw Error('startup completed before creation barrier');})]);
   assert.equal(f.effects.length,1);let settled=false;const closing=f.effects[0]().then(()=>{settled=true;});
@@ -235,7 +243,7 @@ test('M4 close during pending receiver creation drains and disposes the late han
   await f.effects[0]();assert.equal(f.disposeCalls,1);await assert.rejects(fs.stat(f.config.roots.governance),{code:'ENOENT'});
 });
 
-test('M4 duplicate close shares one disposal and waits for receiver quiescence',async t=>{
+test('M4 duplicate close shares one disposal and waits for receiver quiescence',onlySupportedHost,async t=>{
   const f=await m4LifecycleFixture(t,{holdDisposal:true}),owner=await f.start();assert.equal(f.definitions.size,9);
   const first=owner.close(),second=owner.close();assert.equal(first,second);let settled=false;first.then(()=>{settled=true;});
   await f.disposeEntered.promise;assert.equal(f.definitions.size,0);assert.equal(f.disposeCalls,1);assert.equal(f.live.size,1);assert.equal(settled,false);
@@ -244,14 +252,14 @@ test('M4 duplicate close shares one disposal and waits for receiver quiescence',
 });
 
 import {captureGovernanceStartupM4} from '../src/governance/host.mjs';
-test('M4 startup accepts fresh Cordis trace proxies but rejects replaced service origins',async t=>{
+test('M4 startup accepts fresh Cordis trace proxies but rejects replaced service origins',onlySupportedHost,async t=>{
   const f=await m4LifecycleFixture(t),get=f.ctx.get;let replacement=null;
   f.ctx.get=name=>{const target=name==='sandboxPolicy'&&replacement?replacement:get(name);return target&&new Proxy(target,{get:(value,key)=>key===Symbol.for('cordis.original')?value:Reflect.get(value,key)});};
   assert.notEqual(f.ctx.get('tools'),f.ctx.get('tools'));const startup=await captureGovernanceStartupM4(f.ctx,f.config);assert.equal(startup.assert(),true);
   replacement={...get('sandboxPolicy')};assert.throws(()=>startup.assert(),{code:'M4_SERVICE_CHANGED'});
 });
 
-test('M4 startup revalidates each stage effective policy and preset before further effects',async t=>{
+test('M4 startup revalidates each stage effective policy and preset before further effects',onlySupportedHost,async t=>{
   const f=await m4LifecycleFixture(t),startup=await captureGovernanceStartupM4(f.ctx,f.config),stage={session:{id:'stage'},ctx:f.ctx};let changed=false,effects=0;
   const policy=f.ctx.get('sandboxPolicy'),presets=f.ctx.get('agentPresets');policy.resolve=({session})=>({mode:changed&&session===stage.session?'danger-full-access':'read-only',workspaceRoot:f.config.roots.project});
   const operation=()=>{startup.assert(stage);effects++;};operation();assert.equal(effects,1);changed=true;assert.throws(operation,{code:'M4_EFFECTIVE_POLICY'});assert.equal(effects,1);

@@ -4,6 +4,28 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.15.0
+
+### Added
+
+- An opt-in, qualification-only **governance gate** (`src/governance/`, [docs/GOVERNANCE.md](docs/GOVERNANCE.md)): plan → independent plan review → human authorization → author → seal → independent validation and review → accept → qualify → one export. A human drives it with twelve `/gov-*` commands from one fixed receiver session. Every step refuses with a named reason, the correction limit is fixed at two, and test files are pinned by hash.
+- `scripts/setup-governance.mjs` writes inert candidate files for a dedicated host and never mounts them. `scripts/doctor-governance.mjs` diagnoses read-only. `scripts/governance-acceptance.mjs` drives offline acceptance.
+- `/gov-*` commands that take arguments declare Web input hints, so the stock Web composer runs them as commands instead of sending them to the model.
+- The README documents the six mandatory stages (assess, plan, review the plan, implement, validate and review, accept or stop), what the gate enforces for each, and a worked walkthrough.
+
+### Changed
+
+- `orchestrator_delegate` accepts deadlines up to 2,500,000 ms (about 42 minutes), with a matching tool timeout. `orchestrator_run` and `orchestrator_resume` keep 910,000 ms.
+
+### Fixed
+
+- Governance and setup test fixtures resolve the temporary folder to its long native path. Windows CI runners use an 8.3 short name (`RUNNER~1`), which the path guards refused as an alias.
+- Governance host tests that start the host run only on Windows x64 with Node 26.9.0, the only runtime it accepts. A new test checks that other runtimes are refused.
+
+### Validation scope
+
+`gateActive` and `operationallyAccepted` remain `false`: nothing here enables the gate on a working profile. A human walkthrough on a disposable Windows x64/Node 26.9.0 host completed every step, including the refused replay export (`DELIVERY_NOT_AUTHORIZED`). That run was not independently reviewed. CI runs the tests on Linux, macOS and Windows with Node 22 and 24, where the host-start tests are skipped.
+
 ## 1.14.0
 
 ### Added

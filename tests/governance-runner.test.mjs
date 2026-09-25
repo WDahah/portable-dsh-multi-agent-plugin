@@ -1,4 +1,5 @@
 import test from 'node:test';
+import {nativeTmpdir} from './helpers/tmp.mjs';
 import assert from 'node:assert/strict';
 import fs from 'node:fs/promises';
 import * as syncFs from 'node:fs';
@@ -32,7 +33,7 @@ function snapshot(root) {
   walk(root);return rows;
 }
 async function fixture(t,settings = {}) {
-  const root = await fs.mkdtemp(path.join(os.tmpdir(),'m3-runner-')), runners = [], cleanup = [];
+  const root = await fs.mkdtemp(path.join(nativeTmpdir(),'m3-runner-')), runners = [], cleanup = [];
   t.after(async () => {
     for (const runner of runners) await runner.stop().catch(() => {});
     for (const dispose of cleanup) await dispose();
