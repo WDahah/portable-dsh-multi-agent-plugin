@@ -21,10 +21,12 @@ claims, and none of them is promoted by a release note.
 
 - Governance and setup test fixtures resolve the temporary folder to its long native path. Windows CI runners use an 8.3 short name (`RUNNER~1`), which the path guards refused as an alias.
 - Governance host tests that start the host run only on Windows x64 with Node 26.9.0, the only runtime it accepts. A new test checks that other runtimes are refused.
+- Five governance tests that run the real Node test runner are skipped where Node does not accept `--test-isolation` (Node 22). The check probes the running Node instead of assuming a version.
+- On macOS, governance test fixtures use upstream Git (Homebrew) instead of Apple Git, whose version string the workspace pin refuses. They also remove the `core.precomposeunicode` setting macOS Git adds on init, which the closed repository-config allow-list refuses.
 
 ### Validation scope
 
-`gateActive` and `operationallyAccepted` remain `false`: nothing here enables the gate on a working profile. A human walkthrough on a disposable Windows x64/Node 26.9.0 host completed every step, including the refused replay export (`DELIVERY_NOT_AUTHORIZED`). That run was not independently reviewed. CI runs the tests on Linux, macOS and Windows with Node 22 and 24, where the host-start tests are skipped.
+`gateActive` and `operationallyAccepted` remain `false`: nothing here enables the gate on a working profile. A human walkthrough on a disposable Windows x64/Node 26.9.0 host completed every step, including the refused replay export (`DELIVERY_NOT_AUTHORIZED`). That run was not independently reviewed. CI runs the tests on Linux, macOS and Windows with Node 22 and 24, where the host-start tests are skipped, and on Node 22 the five real-runner tests are skipped too. The release commit passed on all six CI legs.
 
 ## 1.14.0
 
