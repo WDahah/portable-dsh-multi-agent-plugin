@@ -4,6 +4,21 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.16.0
+
+### Changed
+
+- The Kimi route family now names the Moonshot open platform route (`moonshotai`) with the model ids that route actually serves: `kimi-k3`, `kimi-k2.6`, `kimi-k2.7-code` and `kimi-k2.7-code-highspeed`. The previous entries named the Kimi Code subscription surface (`kimi-coding`, models `k3` and `kimi-for-coding`), which rejects an open-platform key; the two surfaces are not interchangeable. `surface` reports `official-api` for `moonshotai`, which bills per token rather than through a subscription.
+- The `economy` pool carries four routes across four providers: Luna, DeepSeek V4 Flash, K2.6 and Sonnet. Economy is still never reached by inference; this widens failover and `spread` for callers that ask for it explicitly.
+
+### Removed
+
+- The dedicated `vision` pool and its `deepseek-v4-vision` route. The hosting `dsh-llm-deepseek` 0.1.7-rc.2 catalog no longer ships `deepseek-v4-flash-vision-exp`, and an unlisted model id is served as a **text-only** route: the host replaced every image with a deterministic placeholder, so no image probe could pass. The model is recorded in `UNAVAILABLE_CANDIDATES` as `WITHDRAWN_FROM_HOST_CATALOG` rather than deleted silently. The `vision` role is unchanged and still refuses without a passed image probe.
+
+### Added
+
+- Documented the two host conditions that produce `UNAVAILABLE_AT_PROBE` for reasons no probe can fix: a model id absent from the installed adapter catalog resolves as a text-only route, and a subscription bridge that forwards the harness's `role:"tool"` tool-result message verbatim is refused by OpenAI Responses (`Invalid value: 'tool'`) and Anthropic (`Unexpected role "tool"`). See [README.md](README.md#routing-and-qualification) and [docs/USAGE.md](docs/USAGE.md).
+
 ## 1.15.0
 
 ### Added

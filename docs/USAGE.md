@@ -348,6 +348,13 @@ An `UNAVAILABLE` selection lists one entry per candidate route, and each entry c
 
 Fill in the attestation placeholders yourself: they prompt for a human statement, not values to invent.
 
+Two refusals come from the host rather than from missing evidence, and no probe resolves them.
+
+- A subscription bridge that forwards the harness's `role:"tool"` tool-result message verbatim fails every tool round-trip: OpenAI Responses answers `Invalid value: 'tool'` and Anthropic answers `Unexpected role "tool"`. Every route on that provider then reports `UNAVAILABLE_AT_PROBE` while a plain-text call to the same model succeeds.
+- A model id the installed adapter catalog does not describe is served as a text-only route, so an image probe fails on capability: the request arrives with a placeholder where the image should be. The retired `vision` pool is the worked example — the hosting `dsh-llm-deepseek` 0.1.7-rc.2 catalog no longer lists `deepseek-v4-flash-vision-exp`.
+
+Check the host's model list and its tool-result translation before spending probes on a mapping that cannot pass.
+
 ## Reading cost and usage
 
 Only routes with published pricing report a currency cost, so `costUnknown: true` is ordinary and never means the work was free. Direct tasks report token `usage` per round and as a task total, plus `usageRoundsMissing` when a round never settled — a `null` usage beside a count of unsettled rounds, rather than a zero that would read as no consumption.
@@ -387,6 +394,6 @@ Specialist-domain competence and data confidentiality are **not machine-testable
 
 Any widening beyond `public`/`internal`, or any `domainEvidence`, **requires** both `attestedBy` and `basis`; a malformed attestation is refused before a child starts. Selection rejects a stored record whose policy exceeds ordinary smoke without one (`UNATTESTED_POLICY_WIDENING`). An attestation is a reviewable human claim with an author — it is **not** a capability proof, an entitlement check, or a confidentiality guarantee, and it cannot substitute for a probe result.
 
-The dedicated vision route is reachable only through an explicit `"pool": "vision"`, and still requires a passed image probe. Ordinary image work routes through the normal pools once those routes pass the image probe.
+Image work routes through the ordinary pools, and a route qualifies for it only after a passed image probe. The dedicated `vision` pool was retired with the model it named: the hosting `dsh-llm-deepseek` 0.1.7-rc.2 catalog no longer ships `deepseek-v4-flash-vision-exp`, and an unlisted model id is served as a text-only route, where the host replaces the image before dispatch and no probe can pass. A host whose adapter still lists an image-capable model can reinstate a pool for it after a reviewed mapping change.
 
 The $1 target is informational, not a financial stop or permission override. API costs may be historical estimates; native/subscription totals may be unknown. Never interpret `costUnknown:true` plus zero known-cost subtotal as free execution.

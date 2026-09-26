@@ -29,6 +29,8 @@ An attestation records a named human claim and its written basis, and widens rou
 
 Capability probes consume real quota like any other probe. An image probe writes its generated PNGs through the host attachment service, so those bytes follow that service's ordinary retention.
 
+Routing also depends on host resolution this plugin cannot inspect. A model id the installed adapter catalog does not describe is served as a text-only route, so its images are replaced before dispatch and an image probe fails on capability rather than on reachability. A subscription bridge that forwards the harness's tool-result message verbatim fails every tool round-trip while plain text succeeds. Both conditions reach the plugin as `UNAVAILABLE_AT_PROBE`; they describe the host, not the model.
+
 ## Persistence and recovery
 
 Original prompts and visible outputs are **plaintext** in the state directory. Restrict filesystem access, minimize sensitive content and choose a fresh absolute private directory. Do not copy task/qualification state to manufacture readiness elsewhere. Checksums detect corruption, not a malicious writer who controls the directory.

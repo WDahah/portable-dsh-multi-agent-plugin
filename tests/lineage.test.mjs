@@ -46,7 +46,7 @@ test('a review that fails over onto the provider it avoided stops claiming indep
   dispatcher.dispose();
 });
 test('a failover onto a different provider keeps its independence intact', async () => {
-  const standby = [{route: {id: 'kimi-k3', provider: 'kimi-coding', model: 'k3'}, effort: 'high', qualification: evidence('b')}];
+  const standby = [{route: {id: 'kimi-k3', provider: 'moonshotai', model: 'kimi-k3'}, effort: 'high', qualification: evidence('b')}];
   const dispatcher = createAgentDispatcher({root: fresh(), owner, getSubagents: () => ({async start(_name, request) {
     if (request.agentOptions.provider === 'claude') {
       return {id: 'refused', result: Promise.resolve({stopReason: 'error', error: {code: 'rate_limit'}, output: []}), async dispose() {}};
@@ -58,7 +58,7 @@ test('a failover onto a different provider keeps its independence intact', async
     independence: {independent: true, avoidedProvider: 'codex', alternativesConsidered: ['claude-opus', 'kimi-k3']}},
   {provider: 'claude', model: 'claude-opus-5'}, 'high', exec());
   // Moving to a third provider is still independent of the one under review.
-  assert.equal(result.provider, 'kimi-coding');
+  assert.equal(result.provider, 'moonshotai');
   assert.equal(result.independence.independent, true);
   dispatcher.dispose();
 });

@@ -20,36 +20,36 @@ function route(id, candidateId, provider, model, pools, note, image = false) {
     capabilitiesRequired: image ? ['text', 'tools', 'image'] : ['text', 'tools'],
     pricing: provider === 'deepseek-official' && ['deepseek-flash', 'deepseek-v4-flash'].includes(model) ? {...price} : null,
     immutableModelVersion: false, historicalQualificationTransferred: false,
-    surface: provider === 'deepseek-official' ? 'official-api' : 'subscription', mappingNote: note};
+    surface: provider === 'deepseek-official' || provider === 'moonshotai' ? 'official-api' : 'subscription', mappingNote: note};
 }
 export const ROUTES = freeze([
   route('codex-luna', 'openai-luna', 'codex', 'gpt-5.6-luna', ['economy'], 'API candidate to Codex subscription surface; new qualification required.'),
   route('codex-terra', 'openai-terra', 'codex', 'gpt-5.6-terra', ['balanced'], 'API candidate to Codex subscription surface; new qualification required.'),
   route('codex-sol', 'openai-sol', 'codex', 'gpt-5.6-sol', ['advanced'], 'API candidate to Codex subscription surface; new qualification required.'),
   route('codex-astra', 'openai-astra', 'codex', 'gpt-6-astra', ['long-horizon'], 'API candidate to Codex subscription surface; effort expectations are not measured support.'),
-  route('claude-sonnet', 'claude-sonnet', 'claude', 'claude-sonnet-5', ['balanced'], 'Anthropic API candidate to Claude subscription surface.'),
+  route('claude-sonnet', 'claude-sonnet', 'claude', 'claude-sonnet-5', ['balanced', 'economy'], 'Anthropic API candidate to Claude subscription surface; also offered on the explicit economy tier.'),
   route('claude-opus', 'claude-opus', 'claude', 'claude-opus-5', ['advanced'], 'Anthropic API candidate to Claude subscription surface.'),
   route('claude-fable', 'claude-fable', 'claude', 'claude-fable-5-1', ['long-horizon'], 'Exact requested model string on Claude subscription; moving backend not pinned.'),
   route('deepseek-v41-flash', 'deepseek-v41-label', 'deepseek-official', 'deepseek-flash', ['balanced'], 'Display label V4.1 Flash; runtime model string only, not immutable backend identity.'),
   route('deepseek-v4-flash', 'deepseek-v4-flash', 'deepseek-official', 'deepseek-v4-flash', ['economy'], 'Exact legacy model string; backend version not inferred.'),
   route('deepseek-v4-pro', 'deepseek-v4-pro', 'deepseek-official', 'deepseek-v4-pro', [], 'Declared inventory reserve; no automatic pool assignment.'),
-  route('deepseek-v4-vision', null, 'deepseek-official', 'deepseek-v4-flash-vision-exp', ['vision'], 'Actual V4 vision route is NOT the unresolved historical V4.1 vision label; reachable only through an explicit vision pool and a passed image probe.', true),
-  route('kimi-k3', 'kimi-k3', 'kimi-coding', 'k3', ['advanced', 'long-horizon'], 'Open Platform kimi-k3 candidate to Kimi Coding subscription k3.'),
-  route('kimi-k3-256k', 'kimi-k3-256-label', 'kimi-coding', 'k3-256k', [], 'Explicit nearby spelling resolution for this overlay only; reserve route.'),
-  route('kimi-coding', 'kimi-k27', 'kimi-coding', 'kimi-for-coding', [], 'Explicit surface/model replacement, NOT identity equivalence to historical K2.7; reserve route.'),
-  route('kimi-highspeed', 'kimi-highspeed', 'kimi-coding', 'kimi-for-coding-highspeed', [], 'Subscription surface change; reserve route, not historical qualification.')
+  route('kimi-k3', 'kimi-k3', 'moonshotai', 'kimi-k3', ['advanced', 'long-horizon'], 'Moonshot Open Platform kimi-k3 on the host moonshotai route; the Kimi Code subscription spelling k3 is a different surface.'),
+  route('kimi-k3-256k', 'kimi-k3-256-label', 'moonshotai', 'kimi-k2.6', ['economy'], 'No 256K k3 variant is served by this key; the route carries the distinct kimi-k2.6 model on the explicit economy tier, not an equivalence claim.'),
+  route('kimi-coding', 'kimi-k27', 'moonshotai', 'kimi-k2.7-code', [], 'Open Platform coding model; NOT identity equivalence to a subscription kimi-for-coding. Reserve route.'),
+  route('kimi-highspeed', 'kimi-highspeed', 'moonshotai', 'kimi-k2.7-code-highspeed', [], 'Open Platform highspeed coding model; reserve route, not historical qualification.')
 ]);
 export const UNAVAILABLE_CANDIDATES = freeze([
-  {candidateId: 'deepseek-v41-vision-label', reason: 'UNMAPPED_V41_VISION_LABEL', provider: null, model: null}
+  {candidateId: 'deepseek-v41-vision-label', reason: 'UNMAPPED_V41_VISION_LABEL', provider: null, model: null},
+  // Retired 2026-09-26. The hosting dsh-llm-deepseek 0.1.7-rc.2 catalog no longer ships this
+  // model, so it resolved as an unlisted text-only route: the host replaced every image with
+  // its text-only placeholder and no image probe could pass.
+  {candidateId: 'deepseek-v4-vision', reason: 'WITHDRAWN_FROM_HOST_CATALOG', provider: 'deepseek-official', model: 'deepseek-v4-flash-vision-exp'}
 ]);
 export const POOL_PRIORITY = freeze({
-  economy: ['codex-luna', 'deepseek-v4-flash'],
+  economy: ['codex-luna', 'deepseek-v4-flash', 'kimi-k3-256k', 'claude-sonnet'],
   balanced: ['codex-terra', 'claude-sonnet', 'deepseek-v41-flash'],
   advanced: ['codex-sol', 'claude-opus', 'kimi-k3'],
-  'long-horizon': ['claude-fable', 'codex-astra', 'kimi-k3'],
-  // Explicit-only: image work still routes through ordinary pools when those routes pass
-  // an image probe. This pool exists for deliberately choosing the dedicated vision model.
-  vision: ['deepseek-v4-vision']
+  'long-horizon': ['claude-fable', 'codex-astra', 'kimi-k3']
 });
 /** Roles name what the selector actually does, so a reader can predict the routing from
  * the label. Anything a role cannot decide belongs in `intent`, which is recorded and
@@ -85,7 +85,7 @@ const integer = value => Number.isSafeInteger(value) && value >= 0;
 export function expectedEffort(routeOrId, pool) {
   const entry = typeof routeOrId === 'string' ? ROUTES.find(r => r.id === routeOrId) : routeOrId;
   if (!entry || !Object.hasOwn(POOL_PRIORITY, pool)) throw new TypeError('Unknown route or pool');
-  // vision and the remaining pools use the standard tier; only advanced/long escalate.
+  // economy and balanced use the standard tier; only advanced and long-horizon escalate.
   return entry.effortsExpected[pool === 'long-horizon' ? 'long' : pool === 'advanced' ? 'deep' : 'standard'];
 }
 /** Decide the pool from what the task actually says about itself.

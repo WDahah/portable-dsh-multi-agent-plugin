@@ -322,13 +322,17 @@ Roles are `standard`, `deep`, `review`, `vision` and `domain`. A free-text `inte
 
 | Pool | Candidate priority |
 |---|---|
-| economy | Luna, DeepSeek V4 Flash |
+| economy | Luna, DeepSeek V4 Flash, K2.6, Sonnet |
 | balanced | Terra, Sonnet, DeepSeek V4.1 Flash label |
 | advanced | Sol, Opus, K3 |
 | long-horizon | Fable, Astra, K3 |
-| vision | DeepSeek V4 vision, explicit pool choice |
 
 Model labels/identifiers are those configured in the source, not pinned model versions. Your host must expose the exact provider/model/effort and pass fresh qualification. Route mappings may need a reviewed change on another host. No credentials or transferable qualifications are bundled.
+
+Two host facts decide whether a route can work at all, and the plugin's own tests cannot see either:
+
+- **Provider ids name specific surfaces.** `kimi-coding` is the Kimi Code subscription endpoint (`api.kimi.com/coding`, Anthropic wire, models `k3` and `kimi-for-coding`); `moonshotai` is the Moonshot open platform (`api.moonshot.ai/v1`, OpenAI-compatible, models `kimi-k3`, `kimi-k2.6`, `kimi-k2.7-code`). A key issued for one is rejected by the other, so the two ids are not interchangeable spellings of the same service.
+- **A model id the installed adapter catalog does not describe is served as a text-only route.** The host still forwards the id, but with no image modality: every image block is replaced with a deterministic placeholder before dispatch, so an image probe on that route can never pass. The dedicated `vision` pool was retired for this reason — the hosting `dsh-llm-deepseek` 0.1.7-rc.2 catalog no longer ships `deepseek-v4-flash-vision-exp`, which the 0.1.5-rc.2 compatibility reference did. Read `ctx.llm.listModels(<provider>)`, or the provider's own model list, before qualifying.
 
 Qualification is owner/root-session scoped and expires after **24 hours**. Text/tool probes establish basic reachability; image and structured-output probes cover those specific capabilities. Domain competence and broader data-class permission require a named operator attestation. An attestation records a decision—it does not prove expertise or provider data handling.
 
@@ -345,6 +349,7 @@ Priority order is the default. `spread:true` is deterministic rotation, not live
 - **No peer-agent protocol or shared-write coordination.** Children have delegation depth one; the plugin passes recorded results through the parent. Batches are read-only and cannot prove caller-supplied scopes are independent.
 - **Local durability has limits.** Journals coordinate one process, not several processes or machines. A batch-journal failure aborts siblings; an isolated assignment-journal failure leaves that task incomplete while others may continue. Review uncertain records before replacement work.
 - **Plaintext retention.** Prompts and visible outputs stay in the state directory until removed. Keep it private and use a fresh state directory on another installation. Deletion is permanent; it does not undo external side effects.
+- **A subscription bridge can fail every tool round-trip.** The harness delivers a tool result as its own `role:"tool"` message. A host adapter that translates that shape works; one that forwards the role verbatim is refused by OpenAI Responses (`Invalid value: 'tool'`) and by Anthropic (`Unexpected role "tool"`). The plugin sees only `UNAVAILABLE_AT_PROBE` for every route on that provider while plain-text calls succeed, so a qualification failure can describe the host rather than the model.
 
 [Read the security and limits guide before enabling paid calls or project writes.](docs/SECURITY-AND-LIMITS.md)
 

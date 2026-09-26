@@ -31,7 +31,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "e26e6c5789a2ed78e9d0a1a17979ad3def0ed15b2da86c9245181308657f73f1"
+      "sha256": "cd46edced7a70f4ee76c36b1a86e1093a5c92eec3fa316e6dc432281b59eb93c"
     },
     {
       "path": "CODE_OF_CONDUCT.md",
@@ -43,7 +43,7 @@
     },
     {
       "path": "INSTALL-WITH-AI.md",
-      "sha256": "05426e999b16ee3fdb191333f0daf5fcf78cf52c89a3d4233eae608c750fc5a5"
+      "sha256": "398816f6d5cd3eeb0eaee00ff55096e62e4044500dc3ca771f5094a6c22adf76"
     },
     {
       "path": "LICENSE",
@@ -51,7 +51,7 @@
     },
     {
       "path": "README.md",
-      "sha256": "8385076ddcf1b45fbf566de3bc2727094ca143010bf3012c7829df43cb9f27e2"
+      "sha256": "7447becf782f81c8bf49d29d5c0842cea9a724bea4b366283bb70be9520a7aa5"
     },
     {
       "path": "SECURITY.md",
@@ -87,11 +87,11 @@
     },
     {
       "path": "docs/SECURITY-AND-LIMITS.md",
-      "sha256": "9515fe63aed551093047d531e78964c7a4acdc6cb202b8e530a7fc317fac35a1"
+      "sha256": "bc9a59806c95dfc66e7eefafa8efa91eceffd774a1fa3e18cbe8af9e2c1dbcf1"
     },
     {
       "path": "docs/USAGE.md",
-      "sha256": "8d3e9d46115395932d241f4902b7520b2d05df6db03b45e7596ea3f408d7d103"
+      "sha256": "742474c21fd8fb3d15a9cc402be3a2570a6fcffb4e0a5c0990da99b886ce20aa"
     },
     {
       "path": "docs/benchmarks/native-readonly-trials.csv",
@@ -115,7 +115,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "3c8813c4b56a0aa86a00b24dbe2142503d66cd9a4da71a631c550ca241971c4f"
+      "sha256": "ba4602dd34defb0e9b65a5e26c3503d2ee19da94b1029500cf0720e894b04624"
     },
     {
       "path": "scripts/doctor-governance.mjs",
@@ -215,7 +215,7 @@
     },
     {
       "path": "src/routes.mjs",
-      "sha256": "29f7e995c7c89df6b087e51e91933e2219fea438df596b2c0070a088d6aa0eff"
+      "sha256": "07542c15b737dd43d50db6197ee0fe87260df6de3b6129aca73f886264aecb49"
     },
     {
       "path": "src/verdict.mjs",
@@ -263,7 +263,7 @@
     },
     {
       "path": "tests/escalation.test.mjs",
-      "sha256": "70d4a4e0dae054a76c33d23f95abbd46bd28ad20c31f5cfd079bd9193f1e54dd"
+      "sha256": "246f374959d7f996174bc09eebfc269e3f54bf0731512f228d99fc8003ca9799"
     },
     {
       "path": "tests/evidence.test.mjs",
@@ -319,7 +319,7 @@
     },
     {
       "path": "tests/lineage.test.mjs",
-      "sha256": "1ab3cad41aa569d2969c11f95ee4a6c2fd95eb6507584abeeac3f6c391feb77e"
+      "sha256": "b1a69652679ddfff5e984e43ced6be201c69de0353e9390085c768394228f6aa"
     },
     {
       "path": "tests/loop.test.mjs",
@@ -343,7 +343,7 @@
     },
     {
       "path": "tests/routes.test.mjs",
-      "sha256": "5cbb7e47ade7bd1637a258a1ac029cb7bb7723e573aab2a0581eadf282fb8995"
+      "sha256": "eb4fcba5bb947a34bc6d3ae530ed5c1e1a6bb45d6f52f268bba2a9b58224f750"
     },
     {
       "path": "tests/setup.test.mjs",

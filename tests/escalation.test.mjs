@@ -89,7 +89,7 @@ test('an explicit pool and escalate still win outright', () => {
 });
 test('fewer task shapes reach advanced than before, and none reach a stronger tier', () => {
   const roles = ['standard', 'deep', 'review', 'vision', 'domain'];
-  const rank = {economy: 0, balanced: 1, advanced: 2, 'long-horizon': 3, vision: 1};
+  const rank = {economy: 0, balanced: 1, advanced: 2, 'long-horizon': 3};
   let advanced = 0, total = 0;
   for (const role of roles) for (const risk of ['low', 'medium', 'high', 'critical']) {
     for (const complexity of ['routine', 'moderate', 'complex']) {

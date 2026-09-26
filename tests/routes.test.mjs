@@ -10,10 +10,11 @@ function qualification(id, pool = 'balanced', overrides = {}) {
 }
 const select = (t, qualifications) => selectRoute({task: task(t), qualifications, now: NOW});
 
-test('15 actual runtime strings, immutable nested metadata, no invented V41 vision mapping', () => {
-  assert.equal(ROUTES.length, 15); assert.equal(new Set(ROUTES.map(r => r.id)).size, 15);
-  assert.equal(new Set(ROUTES.map(r => r.provider + '/' + r.model)).size, 15);
-  assert.equal(ROUTES.find(r => r.id === 'deepseek-v4-vision').candidateId, null);
+test('14 actual runtime strings, immutable nested metadata, no invented V41 vision mapping', () => {
+  assert.equal(ROUTES.length, 14); assert.equal(new Set(ROUTES.map(r => r.id)).size, 14);
+  assert.equal(new Set(ROUTES.map(r => r.provider + '/' + r.model)).size, 14);
+  assert.equal(ROUTES.some(r => r.id === 'deepseek-v4-vision'), false);
+  assert.equal(UNAVAILABLE_CANDIDATES.some(c => c.candidateId === 'deepseek-v4-vision' && c.reason === 'WITHDRAWN_FROM_HOST_CATALOG'), true);
   assert.equal(ROUTES.some(r => r.candidateId === 'deepseek-v41-vision-label'), false);
   assert.equal(UNAVAILABLE_CANDIDATES[0].candidateId, 'deepseek-v41-vision-label');
   assert.throws(() => ROUTES[0].pools.push('advanced'), TypeError);
@@ -51,9 +52,8 @@ test('economy only explicit, no cross-pool fallback, reserve routes not silently
   // High risk alone stays on balanced, so terra now serves it; two grounds still refuse.
   assert.equal(select({risk: 'high'}, [qualification('codex-terra')]).route.id, 'codex-terra');
   assert.equal(select({risk: 'high', complexity: 'complex'}, [qualification('codex-terra')]).status, 'UNAVAILABLE');
-  assert.equal(ROUTES.filter(r => r.pools.length === 0).length, 4);
+  assert.equal(ROUTES.filter(r => r.pools.length === 0).length, 3);
   assert.equal(ROUTES.find(r => r.id === 'deepseek-v4-pro').pricing, null);
-  assert.equal(ROUTES.find(r => r.id === 'deepseek-v4-vision').pricing, null);
   assert.equal(POOL_PRIORITY['long-horizon'][0], 'claude-fable');
 });
 test('wrong effort, subscription surface, missing native tool roundtrip do not qualify', () => {
@@ -97,14 +97,13 @@ test('widened policy without a named attestation is refused as tampered', () => 
   // Base policy needs no attestation, so ordinary work is unaffected.
   assert.equal(select({}, [qualification('codex-terra')]).status, 'SELECTED');
 });
-test('attested confidential work and the explicit vision pool select exactly', () => {
+test('attested confidential work selects exactly and the retired vision pool is refused', () => {
   const confidential = qualification('codex-terra', 'balanced', {allowedDataClasses: ['public', 'internal', 'confidential'], attestation: attestation({dataClasses: ['public', 'internal', 'confidential']})});
   assert.equal(select({dataClass: 'confidential'}, [confidential]).route.id, 'codex-terra');
-  const vision = qualification('deepseek-v4-vision', 'vision', {imagePassed: true, caseResults: [{name: 'text', passed: true}, {name: 'native-tool-roundtrip', passed: true}, {name: 'image', passed: true}]});
-  const r = select({pool: 'vision', role: 'R05'}, [vision]);
-  assert.equal(r.status, 'SELECTED'); assert.equal(r.route.id, 'deepseek-v4-vision'); assert.equal(r.reason, 'EXPLICIT_POOL');
-  // The vision route stays out of ordinary pools, so it is never a silent substitute.
-  assert.equal(select({role: 'R05'}, [vision]).status, 'UNAVAILABLE');
+  // The dedicated vision pool was retired with the model it named, so asking for it is invalid
+  // input, and the vision role still refuses without an image probe nothing can currently pass.
+  assert.equal(select({pool: 'vision', role: 'R05'}, []).reason, 'INVALID_INPUT');
+  assert.equal(select({role: 'R05'}, [confidential]).status, 'UNAVAILABLE');
 });
 test('data class and extra capabilities need explicit evidence; no financial gate', () => {
   const q = qualification('codex-terra');
