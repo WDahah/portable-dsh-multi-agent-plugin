@@ -4,6 +4,12 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.17.1
+
+### Fixed
+
+- `scripts/governance-acceptance.mjs` no longer requires `healProfilesModuleFallback` from `dsh-app-boot`. Hosts before 0.1.7-rc.2 exported it to write the `@deepseek-ai/*` fallback a disposable home's profile resolves through; from 0.1.7-rc.2 on the boot resolves the installation's packages from the anchor itself (`collectInstallationScopePackages`) and the export is gone, so an acceptance run against those hosts failed on the missing export rather than on anything it measures. The new `healProfileFallback` helper calls the heal when the host ships it and otherwise records `{healed: false, reason: 'HOST_RESOLVES_INSTALLATION_PACKAGES_FROM_ANCHOR'}` — in `report.moduleFallback` for the M3 run and in the M4 boot result. `tests/governance-acceptance.test.mjs` covers both host states.
+
 ## 1.17.0
 
 ### Added

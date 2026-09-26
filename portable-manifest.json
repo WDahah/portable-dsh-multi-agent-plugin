@@ -31,7 +31,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "000c2ad15b720928c414cb9eb373edc1d0f62080309a3d415d95115f7a717279"
+      "sha256": "8fc3e80ba63f0896661b482ebc39a5207d9ccb459297364f61ca062d92ffc18e"
     },
     {
       "path": "CODE_OF_CONDUCT.md",
@@ -155,7 +155,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "0b691c3cf43fac2f1f23e33f09aa0ffbb162f0b8bfc67e35d03809e80f81d765"
+      "sha256": "91acd3b500f11b947366c2b333d69cb9739b1ede2bc993ff4b0d400292970a7b"
     },
     {
       "path": "scripts/doctor-governance.mjs",
@@ -167,7 +167,7 @@
     },
     {
       "path": "scripts/governance-acceptance.mjs",
-      "sha256": "a48de1230cd3f8d77cb3c4269a11994c3bbac7cd14b85666c0470eed331e2159"
+      "sha256": "20b146f9fe2e0e3d5dabdf1da43cc3a40031935497ac291e89bd571e465095a4"
     },
     {
       "path": "scripts/i18n.mjs",
@@ -312,6 +312,10 @@
     {
       "path": "tests/evidence.test.mjs",
       "sha256": "558c068bdf81ff03e7f6db9661ae42e00f21cabfc86c5c4c7cd6929c36238b92"
+    },
+    {
+      "path": "tests/governance-acceptance.test.mjs",
+      "sha256": "e1615388a002a54a4fa16b27df70cba281898a74c106f1e851b296bb07f51dfd"
     },
     {
       "path": "tests/governance-contracts.test.mjs",

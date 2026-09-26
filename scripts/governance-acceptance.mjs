@@ -17,6 +17,25 @@ const need = (condition, code) => {if (!condition) throw Object.assign(new Error
 const json = (file, value) => fs.writeFile(file, JSON.stringify(value, null, 2) + '\n', {flag: 'wx'});
 const within = (root, target) => {const rel = path.relative(root, target); return rel && !rel.startsWith('..') && !path.isAbsolute(rel);};
 
+/**
+ * Install the `@deepseek-ai/*` fallback a disposable home's profile resolves through, when the
+ * host under acceptance still ships one.
+ *
+ * Hosts before 0.1.7-rc.2 exported `healProfilesModuleFallback` from `dsh-app-boot`. From
+ * 0.1.7-rc.2 on, `collectInstallationScopePackages` resolves the installation's packages from the
+ * anchor inside the boot itself and the export is gone, so its absence is a supported host state
+ * rather than a missing dependency: the harness continues and records which path the host took.
+ * @param appBoot - the imported `dsh-app-boot` module of the installation under acceptance.
+ * @param options - `installAnchor`, the installation's `dsh` manifest, and the disposable `home`.
+ * @returns `{healed: true}`, or `{healed: false, reason}` when the host does the job itself.
+ */
+export async function healProfileFallback(appBoot, {installAnchor, home}) {
+  const heal = appBoot?.healProfilesModuleFallback;
+  if (typeof heal !== 'function') return {healed: false, reason: 'HOST_RESOLVES_INSTALLATION_PACKAGES_FROM_ANCHOR'};
+  await heal({installAnchor, home});
+  return {healed: true};
+}
+
 function parseCli(args) {
   const selected = args.length === 7 && args[5] === '--milestone' && ['M4', 'M4B'].includes(args[6]);
   need((args.length === 5 || selected) && args[0] === '--disposable' && args[1] === '--install-root' && args[3] === '--evidence-root', 'M3_CLOSED_CLI');
@@ -593,10 +612,11 @@ async function m4Boot({root, install, presetRoot, presetId, workspaceRoot = root
   const imp = name => import(pathToFileURL(path.join(install, 'node_modules', '@deepseek-ai', name, 'lib', 'index.js')).href);
   let ctx;
   try {
-    const {boot, healProfilesModuleFallback} = await imp('dsh-app-boot');
+    const appBoot = await imp('dsh-app-boot');
+    const {boot} = appBoot;
     const {createLaunchEnvironmentSnapshot} = await imp('dsh-launch-environment');
     const {LlmAdapter} = await imp('dsh-llm');
-    await healProfilesModuleFallback({installAnchor: path.join(install, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'), home});
+    const moduleFallback = await healProfileFallback(appBoot, {installAnchor: path.join(install, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'), home});
     if (!presetRoot) {
       presetRoot = path.join(home, '.agent-presets'); presetId = 'governed';
       const preset = path.join(presetRoot, presetId); await fs.mkdir(preset, {recursive: true});
@@ -610,7 +630,7 @@ async function m4Boot({root, install, presetRoot, presetId, workspaceRoot = root
       'dsh-agent-presets': {default: presetId, roots: [{path: presetRoot, trust: 'user'}], includeShippedRoot: false, includeUserRoot: false}};
     await json(path.join(profile, 'cordis.yml'), M4_CORE_PACKAGES.filter(name => !omitPolicy || name !== 'dsh-sandbox-policy').map(name => ({id: name, name: '@deepseek-ai/' + name, ...(configs[name] ? {config: configs[name]} : {})})));
     ctx = await boot('governance-m4-owned', path.join(profile, 'cordis.yml'), [], c => c.provide('launchEnvironment', createLaunchEnvironmentSnapshot([])));
-    return {ctx, LlmAdapter, imp, home, port: ctx.get('webServer').port, async close() {
+    return {ctx, LlmAdapter, imp, home, moduleFallback, port: ctx.get('webServer').port, async close() {
       try {await ctx.fiber.dispose();} finally {for (const key of Object.keys(process.env)) delete process.env[key]; Object.assign(process.env, environment);}
     }};
   } catch (error) {
@@ -1487,7 +1507,8 @@ async function main() {
     for (const key of Object.keys(process.env)) delete process.env[key];
     Object.assign(process.env, {SYSTEMROOT: systemRoot, DSH_HOME: home, HOME: home, USERPROFILE: home, TEMP: temp, TMP: temp});
     const imp = name => import(pathToFileURL(path.join(install, 'node_modules', '@deepseek-ai', name, 'lib', 'index.js')).href);
-    const {boot, healProfilesModuleFallback} = await imp('dsh-app-boot');
+    const appBoot = await imp('dsh-app-boot');
+    const {boot} = appBoot;
     const {createLaunchEnvironmentSnapshot} = await imp('dsh-launch-environment');
     const {LlmAdapter} = await imp('dsh-llm');
     report.tools = {node: {...await pinnedTool(PINNED_NODE), version: process.versions.node}, git: await pinnedTool(PINNED_GIT), pwsh: await pinnedTool(PINNED_PWSH)};
@@ -1495,7 +1516,7 @@ async function main() {
     for (const relative of ['scripts/governance-acceptance.mjs', ...['contracts', 'store', 'controller', 'workspace', 'policy', 'runner', 'host'].map(name => `src/governance/${name}.mjs`), ...(milestone !== 'M3' ? ['src/governance/plugin.mjs', 'scripts/setup-governance.mjs', 'scripts/doctor-governance.mjs', 'portable-manifest.json'] : []), ...(milestone === 'M4B' ? ['src/governance/delivery.mjs'] : [])]) {
       const bytes = await fs.readFile(path.join(repository, relative)); report.source.push({path: relative, bytes: bytes.length, sha256: sha256(bytes)});
     }
-    await healProfilesModuleFallback({installAnchor: path.join(install, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'), home});
+    report.moduleFallback = await healProfileFallback(appBoot, {installAnchor: path.join(install, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'), home});
     const noop = path.join(root, 'noop.mjs');
     await fs.writeFile(noop, "export const name='m3-owned-noop';export function apply() {}\n", {flag: 'wx'});
     await json(path.join(preset, 'agent.cordis.yml'), [{id: 'noop', name: pathToFileURL(noop).href}]);
