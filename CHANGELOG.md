@@ -4,6 +4,22 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.17.0
+
+### Added
+
+- **Chinese documentation.** Five reader-facing documents now ship as bilingual pairs with equal authority: [README.md](README.md) / [README.zh.md](README.zh.md), START-HERE, INSTALL-WITH-AI, [docs/USAGE.md](docs/USAGE.md) and [docs/SECURITY-AND-LIMITS.md](docs/SECURITY-AND-LIMITS.md). The English side stays canonical for tooling, so the tests that read shipped prose keep reading the English files. Each pair carries a language switcher and a Chinese summary of the project on the English landing page.
+- `scripts/i18n.mjs` records the git blob hash of both sides of every pair in `<document>.i18n.yaml`, with a `--check` mode for CI. `npm run i18n` re-records; `npm run i18n:check` verifies.
+- `tests/i18n.test.mjs` enforces the pairing contract: both sides present, a fresh record, each side linking to its counterpart, fenced blocks identical across the pair, and `orchestrator_*` tool names carried through unchanged. Translated identifiers are broken instructions, not translations.
+
+### Changed
+
+- CONTRIBUTING.md documents the bilingual workflow and the identifier rule.
+
+### Fixed
+
+- Missing spaces that ran a word into a number, in five published documents: `after24 hours` in START-HERE.md, INSTALL-WITH-AI.md and docs/ARCHITECTURE.md; `default32768`, `default3, maximum8`, `default160000`, `output16384`, `range1024–65536` and `bounded160000-character` in docs/USAGE.md; and `default3/max8` in docs/SECURITY-AND-LIMITS.md. No value changed; the Chinese sides already read them correctly.
+
 ## 1.16.0
 
 ### Changed

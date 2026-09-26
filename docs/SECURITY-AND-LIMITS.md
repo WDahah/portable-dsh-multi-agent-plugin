@@ -1,5 +1,7 @@
 # Security and limits
 
+**English** · [简体中文](SECURITY-AND-LIMITS.zh.md)
+
 Read this before installing into a host, authenticating providers or allowing project writes.
 
 ## Permissions and installation
@@ -53,7 +55,7 @@ Uncertain transport/usage states, cancelled requests and recovered in-flight att
 
 Historical API rate estimates are not current invoices. Subscription/native-agent costs may be unknown; zero known-cost subtotal with `costUnknown:true` does not mean free execution. Reasoning counts must not be charged twice. Provider middleware may perform authentication refresh or internal retries, so one engine attempt is not universally one HTTP request.
 
-Direct tasks have a 15-minute wall-clock deadline beginning at **plan time**, default3/max8 rounds, bounded context/output and requested output-token limits. Native tasks also have bounded rounds/time/context. Adapter behavior can differ; do not equate a requested token limit with proven upstream enforcement. Cancellation is cooperative and cannot prove billing stopped.
+Direct tasks have a 15-minute wall-clock deadline beginning at **plan time**, default 3/max 8 rounds, bounded context/output and requested output-token limits. Native tasks also have bounded rounds/time/context. Adapter behavior can differ; do not equate a requested token limit with proven upstream enforcement. Cancellation is cooperative and cannot prove billing stopped.
 
 Concurrency is deliberately small. Per owner session, **at most 2 qualifications and 2 native delegation/compaction assignments run at once** (`QUALIFICATION_BUSY`, `DELEGATION_BUSY`). Batch workers share those native slots and may wait in an internal FIFO queue of at most 8 pending reservations (`DELEGATION_QUEUE_FULL`); ordinary delegation and compaction still refuse rather than queue. One batch per owner accepts 2–8 independent read-only tasks. Slots remain owned until child result and disposal settle, even after cancellation. This is not a host-wide/provider-wide rate limit: qualification and direct execution do not share the native admission pool.
 

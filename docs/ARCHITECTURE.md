@@ -24,7 +24,7 @@ Root agent session
 
 `src/routes.mjs` holds candidate mappings, pool priorities and expected efforts. The inventory is descriptive; selection requires exact current evidence. Changing a provider surface, model ID, pool order or effort is an explicit policy change requiring aligned definitions/tests and new qualification—not an alias inferred from a similar name.
 
-The qualifier creates one bounded native child with only the active echo challenge available. It verifies the returned marker, simple text result and child identity. Its machine-written record is not a model's self-reported certification. Evidence expires after24 hours and is private to the invoking root agent owner/session. Installing once does not qualify every future project/session.
+The qualifier creates one bounded native child with only the active echo challenge available. It verifies the returned marker, simple text result and child identity. Its machine-written record is not a model's self-reported certification. Evidence expires after 24 hours and is private to the invoking root agent owner/session. Installing once does not qualify every future project/session.
 
 ## Ownership and persistence
 

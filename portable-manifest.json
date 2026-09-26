@@ -31,7 +31,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "cd46edced7a70f4ee76c36b1a86e1093a5c92eec3fa316e6dc432281b59eb93c"
+      "sha256": "000c2ad15b720928c414cb9eb373edc1d0f62080309a3d415d95115f7a717279"
     },
     {
       "path": "CODE_OF_CONDUCT.md",
@@ -39,27 +39,51 @@
     },
     {
       "path": "CONTRIBUTING.md",
-      "sha256": "b423546233056e0505b4f391c9ca6a398b3b75ef8994e3d4cde8ede9a9f69468"
+      "sha256": "1b58c82a6356e509de5c557d087a814370d3f38d3787c326f295f87abd8e3125"
+    },
+    {
+      "path": "INSTALL-WITH-AI.i18n.yaml",
+      "sha256": "ec9273f5ba6f5469755ef848e210c2688884151a9aac9310ad1ad43dfaf70e2e"
     },
     {
       "path": "INSTALL-WITH-AI.md",
-      "sha256": "398816f6d5cd3eeb0eaee00ff55096e62e4044500dc3ca771f5094a6c22adf76"
+      "sha256": "d41cf16f2df511bb2ffa0abd06b902bdb05ea4273678d8ac4860733f6545cc79"
+    },
+    {
+      "path": "INSTALL-WITH-AI.zh.md",
+      "sha256": "a7240ee3764eef01e9761778425aea7d99dc73e2f0ba564fb28968ef3b645017"
     },
     {
       "path": "LICENSE",
       "sha256": "bdb4d733270bbd3dbefbaa1b2a9ddd3d7b2f7f5f8f125888861f15c8c0066281"
     },
     {
+      "path": "README.i18n.yaml",
+      "sha256": "bb8881c7af341ff802339a464469ac84c0681996def2e06f3960b23d00d723b0"
+    },
+    {
       "path": "README.md",
-      "sha256": "7447becf782f81c8bf49d29d5c0842cea9a724bea4b366283bb70be9520a7aa5"
+      "sha256": "3aca33baa0ae197fbc3135b4edf3fd99cc5d9ba90ca491eb496eed1526dacd5c"
+    },
+    {
+      "path": "README.zh.md",
+      "sha256": "b644f5ab4064d8a4d116ac934e60b590b483eb7cb4b1911ab6592dc8daa4b7df"
     },
     {
       "path": "SECURITY.md",
       "sha256": "803eb3c9b943234bd9ad49e352b541b672b8298db06ea817f0c3873d8070334f"
     },
     {
+      "path": "START-HERE.i18n.yaml",
+      "sha256": "37976b756077cdef09f659022ad529128e5b656fa509041db749e178fd59c83e"
+    },
+    {
       "path": "START-HERE.md",
-      "sha256": "c1d0d7b92d393663f1de24146411190b752d9db6c35bf7e10a67ce8da6482367"
+      "sha256": "89f951ad680ae8bd437e102f1f550655b662ff68d980c41a989048243d88615e"
+    },
+    {
+      "path": "START-HERE.zh.md",
+      "sha256": "57570acdd43f8dd4248836be6b352232d4ba45c936be4ae2cdae9f203d18f76f"
     },
     {
       "path": "VALIDATION.md",
@@ -71,7 +95,7 @@
     },
     {
       "path": "docs/ARCHITECTURE.md",
-      "sha256": "967fe1ade322052cf0be79aa4a6259366a27558fdaef46c8ff2418997026f85e"
+      "sha256": "2e921cb1f2d0da33652fddf7cf255537b5d654e3efaf6cebce8993595565f119"
     },
     {
       "path": "docs/BENCHMARK.md",
@@ -86,12 +110,28 @@
       "sha256": "c2a79a3f37fc597a070d3b825cddfd1b7c9bbe853e1e822b01aa527aa5bb96d5"
     },
     {
+      "path": "docs/SECURITY-AND-LIMITS.i18n.yaml",
+      "sha256": "8cdfbbdfa9d1501a82605ae2f85e7243e57c2d02cc773eaca951293bf2c91b7c"
+    },
+    {
       "path": "docs/SECURITY-AND-LIMITS.md",
-      "sha256": "bc9a59806c95dfc66e7eefafa8efa91eceffd774a1fa3e18cbe8af9e2c1dbcf1"
+      "sha256": "73509629f4023b112f8a0dab42ba760da92dde11d84b6b12cff00c17c8efeeda"
+    },
+    {
+      "path": "docs/SECURITY-AND-LIMITS.zh.md",
+      "sha256": "5a01db6d4d102ad975cfa88d06375158089faf9aca2ccc9c7bb09a349b7c21fb"
+    },
+    {
+      "path": "docs/USAGE.i18n.yaml",
+      "sha256": "f324721789f380495f8e200f7424c4926059d740b83d2902aeb77788bee20b1f"
     },
     {
       "path": "docs/USAGE.md",
-      "sha256": "742474c21fd8fb3d15a9cc402be3a2570a6fcffb4e0a5c0990da99b886ce20aa"
+      "sha256": "f880ab9a2639497d55eefd4b3be17846da5faabb7c63bcae9ecdb689fecf5f17"
+    },
+    {
+      "path": "docs/USAGE.zh.md",
+      "sha256": "7bf32cb91ba005134ee6f7a9c2b40737ca7eb420dd88ceb63a75ba5774cb8c87"
     },
     {
       "path": "docs/benchmarks/native-readonly-trials.csv",
@@ -115,7 +155,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "ba4602dd34defb0e9b65a5e26c3503d2ee19da94b1029500cf0720e894b04624"
+      "sha256": "0b691c3cf43fac2f1f23e33f09aa0ffbb162f0b8bfc67e35d03809e80f81d765"
     },
     {
       "path": "scripts/doctor-governance.mjs",
@@ -128,6 +168,10 @@
     {
       "path": "scripts/governance-acceptance.mjs",
       "sha256": "a48de1230cd3f8d77cb3c4269a11994c3bbac7cd14b85666c0470eed331e2159"
+    },
+    {
+      "path": "scripts/i18n.mjs",
+      "sha256": "c6ed2d83380c58e61ee119a2ad184a7ffd46b0f34fe4b94ed90177f197ca2107"
     },
     {
       "path": "scripts/manifest.mjs",
@@ -312,6 +356,10 @@
     {
       "path": "tests/helpers/tmp.mjs",
       "sha256": "d0e82a4c8b114b779f2445887e0398318cc7f2a8d5191e34e1414d7c9bc091c7"
+    },
+    {
+      "path": "tests/i18n.test.mjs",
+      "sha256": "4a4438ecac0ed684f7d4c612c54ee88d1f3c81bbdc79d06e59499ac8c995951b"
     },
     {
       "path": "tests/integrity.test.mjs",

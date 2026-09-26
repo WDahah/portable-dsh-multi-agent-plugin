@@ -1,5 +1,7 @@
 # Install with any capable AI assistant
 
+**English** · [简体中文](INSTALL-WITH-AI.zh.md)
+
 Copy this entire prompt into the AI you want to help with installation. Replace the three bracketed values first. The AI must be able to inspect local files and the intended host; a chat-only AI can explain the steps but cannot claim it executed them.
 
 ```text
@@ -46,7 +48,7 @@ Authority and scope:
 - Obtain provider/model inventory through the real host's registered services, including listModels and exact model/effort contracts where supported. Do not print credentials or whole settings objects.
 - Authenticate only through the host's approved UI or official authentication flow. Never request API keys in chat, clipboard dumps or copied account files.
 - Do not fabricate providers, aliases, effort support or qualifications. If the host uses different IDs, propose an explicit mapping change covering ROUTES, POOL_PRIORITY, expected efforts and related tests; obtain any additional source-edit authority needed, then requalify it. Do not silently substitute a similar model or convert synthetic fixtures into live records.
-- In the SAME ROOT AGENT SESSION that will dispatch this project's work, call orchestrator_inventory and run orchestrator_qualify for only the needed exact route/effort pairs. Each must pass the real native-child text/tool echo challenge. Evidence is owner/session-scoped and expires after24 hours; a new project/session must establish its own evidence.
+- In the SAME ROOT AGENT SESSION that will dispatch this project's work, call orchestrator_inventory and run orchestrator_qualify for only the needed exact route/effort pairs. Each must pass the real native-child text/tool echo challenge. Evidence is owner/session-scoped and expires after 24 hours; a new project/session must establish its own evidence.
 - Mark failed, unsupported or unauthenticated routes unavailable, with their observed outcome. Do not repeatedly retry a failed probe automatically, uninstall a provider, or claim every pool is ready when only one route passed.
 - Generic text/tool smoke is not image or specialist-domain qualification. The `vision` role requires image evidence; the `domain` role requires domain evidence. Use `standard` or `deep` for ordinary planning, coding or review, not a false specialist label.
 

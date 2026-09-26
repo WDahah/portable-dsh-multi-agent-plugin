@@ -1,6 +1,6 @@
 {
   "name": "portable-dsh-multi-agent",
-  "version": "1.16.0",
+  "version": "1.17.0",
   "private": true,
   "type": "module",
   "description": "Portable DeepSeek Harness/Cordis native plugin for task-routed model selection, scoped child-agent delegation, and durable bounded continuation.",
@@ -24,6 +24,8 @@
     "doctor": "node scripts/doctor.mjs",
     "verify": "node scripts/verify.mjs",
     "manifest": "node scripts/manifest.mjs",
-    "manifest:check": "node scripts/manifest.mjs --check"
+    "manifest:check": "node scripts/manifest.mjs --check",
+    "i18n": "node scripts/i18n.mjs",
+    "i18n:check": "node scripts/i18n.mjs --check"
   }
 }

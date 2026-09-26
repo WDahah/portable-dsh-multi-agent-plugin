@@ -1,5 +1,9 @@
 # Multi-agent: portable DSH/Cordis orchestration plugin
 
+**English** · [简体中文](README.zh.md)
+
+> **中文读者**：完整中文文档见 [README.zh.md](README.zh.md)，其中包括[使用指南](docs/USAGE.zh.md)与[安全与限制](docs/SECURITY-AND-LIMITS.zh.md)。本插件为 DeepSeek Harness (DSH)/Cordis 宿主提供路由选择、有界子 agent 委派、并行只读批处理与结构化评审记录；它依据本会话的实时资格证据工作，**不会自动节省 token**，也不保证裁定正确。
+
 [![CI](https://github.com/WDahah/portable-dsh-multi-agent-plugin/actions/workflows/ci.yml/badge.svg)](https://github.com/WDahah/portable-dsh-multi-agent-plugin/actions/workflows/ci.yml)
 [![Release](https://img.shields.io/github/v/release/WDahah/portable-dsh-multi-agent-plugin)](https://github.com/WDahah/portable-dsh-multi-agent-plugin/releases)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)

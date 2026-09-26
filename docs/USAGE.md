@@ -1,5 +1,7 @@
 # Usage
 
+**English** · [简体中文](USAGE.zh.md)
+
 Use these tools **inside the compatible running DSH host**, after activation and fresh qualification in the same root agent session. Tool notation below is illustrative; invoke the actual registered tool, not a made-up shell command.
 
 ## The fifteen tools
@@ -320,9 +322,9 @@ This matters more than it sounds: before 1.13.0 the record kept the independence
 
 Call `orchestrator_plan` with `task`, unique `task_id`, `prompt`, and optionally `max_rounds`, `context_chars`, `max_tokens`; then call `orchestrator_run({"task_id":"..."})`. Read with `orchestrator_read({"task_id":"...","page":0})`. Direct work does not run project tools.
 
-- Direct `max_tokens`: **64–65536**, default32768. Adapters may differ in actual limit enforcement; requested limits are not universal proof of upstream behavior.
-- Round limit: default3, maximum8. Direct context default160000 characters. Direct deadline: **15 minutes beginning at plan time**, retained across recovery.
-- Native delegation default output16384 tokens, range1024–65536; default3/max8 rounds, 15-minute deadline, bounded160000-character continuation input. Native `maxDepth:1` is an absolute root-child cap; call from a root agent session.
+- Direct `max_tokens`: **64–65536**, default 32768. Adapters may differ in actual limit enforcement; requested limits are not universal proof of upstream behavior.
+- Round limit: default 3, maximum 8. Direct context default 160000 characters. Direct deadline: **15 minutes beginning at plan time**, retained across recovery.
+- Native delegation default output 16384 tokens, range 1024–65536; default 3/max 8 rounds, 15-minute deadline, bounded 160000-character continuation input. Native `maxDepth:1` is an absolute root-child cap; call from a root agent session.
 - Clean `max-tokens` plus valid settlement and new visible progress may continue. Empty/repeated output or technical limits stop further rounds. Read-only native continuation starts a **new child**, not a promise of same-child memory.
 - Writes/edits/commands disable automatic native continuation because side effects may already have happened. Cancellation, transport loss and uncertain usage are not automatically retried. `orchestrator_resume` cannot override an unsafe state.
 
