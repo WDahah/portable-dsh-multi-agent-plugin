@@ -36,6 +36,41 @@ export async function healProfileFallback(appBoot, {installAnchor, home}) {
   return {healed: true};
 }
 
+/**
+ * The agent-preset API an installation under acceptance provides.
+ *
+ * 0.1.5 shipped `@deepseek-ai/dsh-agent-presets`, which discovered presets from configured roots.
+ * 0.1.7 split it into `@deepseek-ai/dsh-agent-preset-registry` (the service, which takes only a
+ * default) and `@deepseek-ai/dsh-agent-preset` (one row per preset, carrying its plugin list), so a
+ * fixture profile has to name and configure whichever the installation has.
+ * @param install - the installation root under acceptance.
+ * @returns `'registry'`, `'roots'`, or `null` when the installation provides neither.
+ */
+export async function presetHostApi(install) {
+  const present = async name => {try {return (await fs.stat(path.join(install, 'node_modules', '@deepseek-ai', name))).isDirectory();} catch (error) {if (error?.code === 'ENOENT') return false; throw error;}};
+  if (await present('dsh-agent-preset-registry')) return 'registry';
+  if (await present('dsh-agent-presets')) return 'roots';
+  return null;
+}
+
+/**
+ * The fixture profile's preset rows for one authored preset directory.
+ *
+ * A roots host discovers `<presetRoot>/<presetId>` through the registry's roots. A registry host
+ * discovers nothing, so the same preset is declared inline with the composition that directory
+ * holds and the registry is given only the default id.
+ * @param options - the installation, the authored directory, and the preset's identity and plugins.
+ * @returns the package names to mount, their configs, and the declaration rows to append.
+ */
+export async function presetHostRows({install, presetRoot, presetId, presetPlugins, name, description}) {
+  const api = await presetHostApi(install);
+  need(api !== null, 'PRESET_API_ABSENT');
+  if (api === 'roots') return {api, packages: ['dsh-agent-presets'],
+    configs: {'dsh-agent-presets': {default: presetId, roots: [{path: presetRoot, trust: 'user'}], includeShippedRoot: false, includeUserRoot: false}}, rows: []};
+  return {api, packages: ['dsh-agent-preset-registry', 'dsh-agent-preset'], configs: {'dsh-agent-preset-registry': {default: presetId}},
+    rows: [{id: 'preset-' + presetId, name: '@deepseek-ai/dsh-agent-preset', config: {id: presetId, name, description, plugins: presetPlugins}}]};
+}
+
 function parseCli(args) {
   const selected = args.length === 7 && args[5] === '--milestone' && ['M4', 'M4B'].includes(args[6]);
   need((args.length === 5 || selected) && args[0] === '--disposable' && args[1] === '--install-root' && args[3] === '--evidence-root', 'M3_CLOSED_CLI');
@@ -617,20 +652,31 @@ async function m4Boot({root, install, presetRoot, presetId, workspaceRoot = root
     const {createLaunchEnvironmentSnapshot} = await imp('dsh-launch-environment');
     const {LlmAdapter} = await imp('dsh-llm');
     const moduleFallback = await healProfileFallback(appBoot, {installAnchor: path.join(install, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'), home});
+    let presetPlugins;
     if (!presetRoot) {
       presetRoot = path.join(home, '.agent-presets'); presetId = 'governed';
       const preset = path.join(presetRoot, presetId); await fs.mkdir(preset, {recursive: true});
       const noop = path.join(root, 'noop.mjs'); await fs.writeFile(noop, "export const name='m4-owned-noop';export function apply() {}\n", {flag: 'wx'});
-      await json(path.join(preset, 'agent.cordis.yml'), [{id: 'noop', name: pathToFileURL(noop).href}]);
+      presetPlugins = [{id: 'noop', name: pathToFileURL(noop).href}];
+      await json(path.join(preset, 'agent.cordis.yml'), presetPlugins);
       await fs.writeFile(path.join(preset, 'preset.yml'), 'name: M4 owned control\ndescription: No capabilities\n', {flag: 'wx'});
+    } else {
+      // An authored root is reused as-is; a registry host needs its composition declared inline.
+      presetPlugins = JSON.parse(await fs.readFile(path.join(presetRoot, presetId, 'agent.cordis.yml'), 'utf8'));
     }
+    const presetHost = await presetHostRows({install, presetRoot, presetId, presetPlugins, name: 'M4 owned control', description: 'No capabilities'});
     const configs = {'dsh-credentials-local': {path: path.join(home, '.credentials.yaml'), watch: false}, 'dsh-tools': {mode: 'native'},
       'dsh-agent-loop': {agents: [], maxParallelToolCalls: 1}, 'dsh-host-webserver': {host: '127.0.0.1', port: 0},
       'dsh-sandbox-policy': {mode, workspaceRoot},
-      'dsh-agent-presets': {default: presetId, roots: [{path: presetRoot, trust: 'user'}], includeShippedRoot: false, includeUserRoot: false}};
-    await json(path.join(profile, 'cordis.yml'), M4_CORE_PACKAGES.filter(name => !omitPolicy || name !== 'dsh-sandbox-policy').map(name => ({id: name, name: '@deepseek-ai/' + name, ...(configs[name] ? {config: configs[name]} : {})})));
+      ...presetHost.configs};
+    // The preset slot in this list is whatever the host provides; see presetHostRows.
+    const rows = M4_CORE_PACKAGES.filter(name => !omitPolicy || name !== 'dsh-sandbox-policy')
+      .flatMap(name => name === 'dsh-agent-presets' ? presetHost.packages : [name])
+      .map(name => ({id: name, name: '@deepseek-ai/' + name, ...(configs[name] ? {config: configs[name]} : {})}))
+      .concat(presetHost.rows);
+    await json(path.join(profile, 'cordis.yml'), rows);
     ctx = await boot('governance-m4-owned', path.join(profile, 'cordis.yml'), [], c => c.provide('launchEnvironment', createLaunchEnvironmentSnapshot([])));
-    return {ctx, LlmAdapter, imp, home, moduleFallback, port: ctx.get('webServer').port, async close() {
+    return {ctx, LlmAdapter, imp, home, moduleFallback, presetApi: presetHost.api, port: ctx.get('webServer').port, async close() {
       try {await ctx.fiber.dispose();} finally {for (const key of Object.keys(process.env)) delete process.env[key]; Object.assign(process.env, environment);}
     }};
   } catch (error) {
@@ -1519,10 +1565,14 @@ async function main() {
     report.moduleFallback = await healProfileFallback(appBoot, {installAnchor: path.join(install, 'node_modules', '@deepseek-ai', 'dsh', 'package.json'), home});
     const noop = path.join(root, 'noop.mjs');
     await fs.writeFile(noop, "export const name='m3-owned-noop';export function apply() {}\n", {flag: 'wx'});
-    await json(path.join(preset, 'agent.cordis.yml'), [{id: 'noop', name: pathToFileURL(noop).href}]);
+    const presetPlugins = [{id: 'noop', name: pathToFileURL(noop).href}];
+    await json(path.join(preset, 'agent.cordis.yml'), presetPlugins);
     await fs.writeFile(path.join(preset, 'preset.yml'), 'name: M3 disposable governed fixture\ndescription: Acceptance-owned empty preset\n', {flag: 'wx'});
-    const packages = ['dsh-agent', 'dsh-session', 'dsh-llm', 'dsh-system-prompt', 'dsh-tools', 'dsh-session-projection', 'dsh-agent-loop', 'dsh-commands', 'dsh-host-webserver', 'dsh-subprocess-local', 'dsh-sandbox-local', 'dsh-agent-presets', 'dsh-typert-registry', 'dsh-typert-loader', 'dsh-api-gateway', 'dsh-credentials-local', 'dsh-client-connection'];
-    const config = {'dsh-credentials-local': {path: path.join(home, '.credentials.yaml'), watch: false}, 'dsh-tools': {mode: 'native'}, 'dsh-agent-loop': {agents: [], maxParallelToolCalls: 1}, 'dsh-host-webserver': {host: '127.0.0.1', port: 0}, 'dsh-agent-presets': {default: 'governed', roots: [{path: presets, trust: 'user'}], includeShippedRoot: false, includeUserRoot: false}};
+    const presetHost = await presetHostRows({install, presetRoot: presets, presetId: 'governed', presetPlugins, name: 'M3 disposable governed fixture', description: 'Acceptance-owned empty preset'});
+    report.presetApi = presetHost.api;
+    // The preset slot in this list is whatever the host provides; see presetHostRows.
+    const packages = ['dsh-agent', 'dsh-session', 'dsh-llm', 'dsh-system-prompt', 'dsh-tools', 'dsh-session-projection', 'dsh-agent-loop', 'dsh-commands', 'dsh-host-webserver', 'dsh-subprocess-local', 'dsh-sandbox-local', 'dsh-agent-presets', 'dsh-typert-registry', 'dsh-typert-loader', 'dsh-api-gateway', 'dsh-credentials-local', 'dsh-client-connection'].flatMap(name => name === 'dsh-agent-presets' ? presetHost.packages : [name]);
+    const config = {'dsh-credentials-local': {path: path.join(home, '.credentials.yaml'), watch: false}, 'dsh-tools': {mode: 'native'}, 'dsh-agent-loop': {agents: [], maxParallelToolCalls: 1}, 'dsh-host-webserver': {host: '127.0.0.1', port: 0}, ...presetHost.configs};
     report.packages = [];
     for (const name of [...packages, 'dsh-app-boot', 'dsh-launch-environment', 'dsh-sandbox-windows-acl', ...(milestone !== 'M3' ? ['dsh-sandbox-policy', 'cordis'] : [])]) {
       const directory = path.join(install, 'node_modules', '@deepseek-ai', name);
@@ -1530,7 +1580,7 @@ async function main() {
       const entry = path.join(directory, 'lib', 'index.js');
       report.packages.push({name, version: JSON.parse(manifest).version, manifestSha256: sha256(manifest), entry: await fs.realpath(entry), entrySha256: sha256(await fs.readFile(entry))});
     }
-    await json(path.join(profile, 'cordis.yml'), packages.map(name => ({id: name, name: '@deepseek-ai/' + name, ...(config[name] ? {config: config[name]} : {})})));
+    await json(path.join(profile, 'cordis.yml'), packages.map(name => ({id: name, name: '@deepseek-ai/' + name, ...(config[name] ? {config: config[name]} : {})})).concat(presetHost.rows));
     await json(path.join(root, 'authority.json'), {root, home, project, port: 0, packages, providers: ['scripted-owned-only'], noCredentialsCopied: true, activeGuiUntouched: true, operationalActivation: false});
     let generated, qualification, inheritedM4Started;
     const timings = {};

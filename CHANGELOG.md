@@ -4,6 +4,17 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.18.0
+
+### Added
+
+- **Support for the agent-preset API that 0.1.7 hosts provide.** 0.1.7 replaced `@deepseek-ai/dsh-agent-presets` with `@deepseek-ai/dsh-agent-preset-registry` (the service, whose config is only a default) and `@deepseek-ai/dsh-agent-preset` (one row per preset, carrying that preset's plugin list). `scripts/setup-governance.mjs` now generates the patch the installation under setup can use: a roots host keeps the configured preset root and its discovery flags, while a registry host gets the default plus an inline declaration of the same preset whose plugin list the generated `governed-preset/agent.cordis.yml` also holds. A host that provides neither refuses with `M4_SETUP_PRESET_API_ABSENT` before creating any output, and every generated report records `presetApi`.
+- `scripts/governance-acceptance.mjs` composes its M3 and M4 fixture profiles from the installation under acceptance (`presetHostApi`, `presetHostRows`) and records `presetApi` in the M3 report; its M4 boot returns `presetApi` beside the module-fallback result.
+
+### Fixed
+
+- Generated configuration no longer names `@deepseek-ai/dsh-agent-presets` on a host that does not ship it. Renaming alone would not have been enough: the 0.1.7 registry's config schema accepts and preserves unknown keys, so the old `roots`, `includeShippedRoot` and `includeUserRoot` would have been ignored while `default` still named a preset nothing registered — a silent failure rather than a load error. Against the installed schemas the new registry config and the declaration both validate, and the legacy config validates without taking effect.
+
 ## 1.17.1
 
 ### Fixed

@@ -133,7 +133,7 @@ import {digest as m4Digest} from '../src/governance/contracts.mjs';
 import {openGovernanceStoreV2} from '../src/governance/store.mjs';
 const m4Hash=bytes=>createHash('sha256').update(bytes).digest('hex');
 const m4Deferred=()=>{let resolve;const promise=new Promise(r=>{resolve=r;});return {promise,resolve};};
-async function m4Fixture(t){
+async function m4Fixture(t,{presetApi='roots'}={}){
   const root=await fs.mkdtemp(path.join(nativeTmpdir(),'m4-setup-'));t.after(()=>fs.rm(root,{recursive:true,force:true,maxRetries:5,retryDelay:50}));
   const bundle=path.join(root,"bundle space ü '"),install=path.join(root,'installed host'),outputRoot=path.join(root,'candidate output');
   await fs.mkdir(path.join(bundle,'src','governance'),{recursive:true});await fs.mkdir(install);
@@ -144,6 +144,12 @@ async function m4Fixture(t){
   const tools=path.join(install,'node_modules','@deepseek-ai','dsh-tools');await fs.mkdir(tools,{recursive:true});
   await fs.writeFile(path.join(tools,'package.json'),JSON.stringify({name:'@deepseek-ai/dsh-tools',type:'module',exports:'./index.js'}));
   await fs.writeFile(path.join(tools,'index.js'),'export const defineTool=value=>value;\n');
+  const presetPackages=presetApi==='registry'?['dsh-agent-preset-registry','dsh-agent-preset']:presetApi==='roots'?['dsh-agent-presets']:[];
+  for(const name of presetPackages) {
+    const dir=path.join(install,'node_modules','@deepseek-ai',name);await fs.mkdir(dir,{recursive:true});
+    await fs.writeFile(path.join(dir,'package.json'),JSON.stringify({name:'@deepseek-ai/'+name,type:'module',exports:'./index.js'}));
+    await fs.writeFile(path.join(dir,'index.js'),'export const fixture=true;\n');
+  }
   const host=path.join(install,'host.mjs');await fs.writeFile(host,'export const hostFixture=true;\n');
   const git=path.join(install,'git-fixture');await fs.writeFile(git,'inert git pin');
   const roots=Object.fromEntries(['project','governance','workspace','scratch','legacy','config'].map(key=>[key,path.join(root,'runtime-'+key)]));
@@ -193,6 +199,28 @@ test('M4 setup writes exactly five inert files with escaped file URLs and comple
   assert.deepEqual(Object.keys(patch[1]),['insert']);assert.equal(patch[1].insert.length,1);assert.equal(patch[1].insert[0].id,'governance-m4');
   for(const root of Object.values(f.roots))await assert.rejects(fs.stat(root),{code:'ENOENT'});
   assert.deepEqual(await m4Tree(f.install),before);assert.equal(result.hostModified,false);assert.equal(result.providerCalls,0);
+});
+
+test('M4 setup targets the split preset API a 0.1.7 host provides',async t=>{
+  const f=await m4Fixture(t,{presetApi:'registry'}),result=await prepareGovernanceSetup(f.args);
+  const patch=JSON.parse(await fs.readFile(path.join(f.outputRoot,'host-patch.yml'),'utf8')),report=JSON.parse(await fs.readFile(result.reportPath,'utf8'));
+  assert.equal(report.presetApi,'registry');
+  // The registry owns the service and takes only a default; the preset itself is declared with its
+  // plugin list, because a registry host discovers no roots.
+  assert.deepEqual(patch[0],{id:'agent-preset-registry',name:'@deepseek-ai/dsh-agent-preset-registry',config:{default:'governed-preset'}});
+  assert.equal(patch[1].insert.length,2);
+  assert.deepEqual(patch[1].insert[0],{id:'preset-governed-preset',name:'@deepseek-ai/dsh-agent-preset',config:{id:'governed-preset',
+    name:'Inert governed M4 candidate',description:'No raw tools; diagnostic host prerequisite. Setup does not install or activate.',
+    plugins:[{id:'governed-preset',name:pathToFileURL(path.join(f.outputRoot,'entry.mjs')).href,config:{role:'preset'}}]}});
+  assert.equal(patch[1].insert[1].id,'governance-m4');
+  // The declaration and the generated preset file carry the same plugin, from one source.
+  assert.deepEqual(JSON.parse(await fs.readFile(path.join(f.outputRoot,'governed-preset','agent.cordis.yml'),'utf8')),patch[1].insert[0].config.plugins);
+});
+
+test('M4 setup refuses a host that provides neither preset API before writing',async t=>{
+  const f=await m4Fixture(t,{presetApi:null});
+  await assert.rejects(prepareGovernanceSetup(f.args),{code:'M4_SETUP_PRESET_API_ABSENT'});
+  await assert.rejects(fs.stat(f.outputRoot),{code:'ENOENT'});
 });
 
 test('M4 setup pins manifest install and config before creating any output',async t=>{

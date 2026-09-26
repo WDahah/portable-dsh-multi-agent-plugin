@@ -31,7 +31,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "8fc3e80ba63f0896661b482ebc39a5207d9ccb459297364f61ca062d92ffc18e"
+      "sha256": "d2ee6455896335d332b817aad582de31a2784da280e6e3b4bcb706452d88dd1c"
     },
     {
       "path": "CODE_OF_CONDUCT.md",
@@ -155,7 +155,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "91acd3b500f11b947366c2b333d69cb9739b1ede2bc993ff4b0d400292970a7b"
+      "sha256": "76e50cad5353bb277340bc0a9fc475944dbbac0bb404969423887ac0a5b329a0"
     },
     {
       "path": "scripts/doctor-governance.mjs",
@@ -167,7 +167,7 @@
     },
     {
       "path": "scripts/governance-acceptance.mjs",
-      "sha256": "20b146f9fe2e0e3d5dabdf1da43cc3a40031935497ac291e89bd571e465095a4"
+      "sha256": "814c16338252f533faef278c8c2d2d025775d8e0119ff0c3348fa42203ca677e"
     },
     {
       "path": "scripts/i18n.mjs",
@@ -179,7 +179,7 @@
     },
     {
       "path": "scripts/setup-governance.mjs",
-      "sha256": "6eb81c7a521564f3f9f5cb5a10e03cd0fb681824e3cd520a8cb2cde8c0218e86"
+      "sha256": "bc6366a644dff4e33dddfe142d93b4acb3501dc4ad543d97376aad702f177b18"
     },
     {
       "path": "scripts/setup.mjs",
@@ -315,7 +315,7 @@
     },
     {
       "path": "tests/governance-acceptance.test.mjs",
-      "sha256": "e1615388a002a54a4fa16b27df70cba281898a74c106f1e851b296bb07f51dfd"
+      "sha256": "808dada18500cbfc9416aaf18632e214841f2b2497786b5260fbc1e839fa6f59"
     },
     {
       "path": "tests/governance-contracts.test.mjs",
@@ -399,7 +399,7 @@
     },
     {
       "path": "tests/setup.test.mjs",
-      "sha256": "8148834434815a0efb24a147ba509d2e0a4c11781e787ca1a6ad99360c71a702"
+      "sha256": "7fddcc12dd3172034a0a8eed0a5c3863e06ae82317cc4134a46cac3d7d050ef4"
     },
     {
       "path": "tests/state-management.test.mjs",

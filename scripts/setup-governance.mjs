@@ -95,6 +95,24 @@ export function readGovernanceConfigM4(configPath) {
   verifyFile(snapshot);return {config,sha256:snapshot.sha256};
 }
 
+/**
+ * The agent-preset API an installation provides.
+ *
+ * 0.1.5 shipped one registry package, `@deepseek-ai/dsh-agent-presets`, which discovered presets
+ * from configured roots. 0.1.7 split it: `@deepseek-ai/dsh-agent-preset-registry` owns the service
+ * and takes only a default, and each preset is declared by a `@deepseek-ai/dsh-agent-preset` row
+ * carrying its plugin list. The generated patch names and configures whichever the host has.
+ * @param installPath - installation root whose `node_modules` supplies the harness packages.
+ * @returns `'registry'`, `'roots'`, or `null` when the installation provides neither.
+ */
+function detectPresetApi(installPath) {
+  const require=createRequire(path.join(installPath,'package.json'));
+  const present=name=>{try {require.resolve(name);return true;} catch (error) {if(error?.code==='MODULE_NOT_FOUND') return false;throw error;}};
+  if(present('@deepseek-ai/dsh-agent-preset-registry')) return 'registry';
+  if(present('@deepseek-ai/dsh-agent-presets')) return 'roots';
+  return null;
+}
+
 /** Generate an inert candidate only. All inputs are explicit owner selections; no installed profile is changed. */
 export async function prepareGovernanceSetup(input) {
   const o=options(input),bundle=ordinaryPath(o.bundleRoot,{directory:true}),install=ordinaryPath(o.installRoot,{directory:true});
@@ -125,6 +143,8 @@ export async function prepareGovernanceSetup(input) {
   const toolsSelected=createRequire(path.join(install.path,'package.json')).resolve('@deepseek-ai/dsh-tools');
   // Package-manager links select installed modules only; all retained I/O uses their exact canonical targets.
   const toolsPath=fs.realpathSync.native(toolsSelected);
+  const presetApi=detectPresetApi(install.path);
+  need(presetApi!==null,'M4_SETUP_PRESET_API_ABSENT');
   const tools=fileSnapshot(toolsPath,16777216),host=fileSnapshot(config.toolchain.host.executable,16777216);
   need(host.sha256===config.toolchain.host.sha256,'M4_SETUP_HOST_PIN');inputs.push(tools,host);
   for(const record of inputs)separate(outputRoot,record.file);
@@ -137,7 +157,7 @@ export async function prepareGovernanceSetup(input) {
   fs.mkdirSync(outputRoot,{mode:0o700});
   const output=ordinaryPath(outputRoot,{directory:true}),created=new Map(),dirs=new Map([[outputRoot,rootIdentity(stat(outputRoot))]]);
   let reportFd,reportIdentity,reportHash,complete=false,primaryError;
-  const report={kind:'m4-inert-generation',schemaVersion:1,status:'incomplete',mode:'diagnostic',hostModified:false,hostStarted:false,
+  const report={kind:'m4-inert-generation',schemaVersion:1,status:'incomplete',mode:'diagnostic',hostModified:false,hostStarted:false,presetApi,
     providerCalls:0,operationallyAccepted:false,pins:{bundleSha256:manifest.sha256,installSha256:installed.sha256,configSha256:supplied.sha256,
       toolsSha256:tools.sha256,hostSha256:host.sha256},expectedFiles:[...OUTPUTS,REPORT],files:[],reason:null};
   const verifyOutput=(contents=true)=>{
@@ -164,12 +184,18 @@ export async function prepareGovernanceSetup(input) {
     await hit('report-created');
     const entryPath=path.join(outputRoot,'entry.mjs'),pluginPath=path.join(bundle.path,'src','governance','plugin.mjs');
     const entry=`// Inert generated candidate. Setup never mounts or activates this entry.\nimport {defineTool} from ${JSON.stringify(pathToFileURL(toolsPath).href)};\nimport {createGovernancePluginM4} from ${JSON.stringify(pathToFileURL(pluginPath).href)};\nexport default createGovernancePluginM4(defineTool);\n`;
-    const patch=[{id:'agent-presets',name:'@deepseek-ai/dsh-agent-presets',config:{default:'governed-preset',
-      roots:[{path:outputRoot,trust:'user'}],includeShippedRoot:false,includeUserRoot:false}},
-      {insert:[{id:'governance-m4',name:pathToFileURL(entryPath).href,config}]}];
+    const preset={id:'governed-preset',name:'Inert governed M4 candidate',description:'No raw tools; diagnostic host prerequisite. Setup does not install or activate.'};
+    const presetPlugin={id:preset.id,name:pathToFileURL(entryPath).href,config:{role:'preset'}};
+    // A roots host discovers the preset directory written below; a registry host takes only a default
+    // and is populated by a declaration row carrying the preset's plugin list.
+    const presetRow=presetApi==='registry'
+      ? {id:'agent-preset-registry',name:'@deepseek-ai/dsh-agent-preset-registry',config:{default:preset.id}}
+      : {id:'agent-presets',name:'@deepseek-ai/dsh-agent-presets',config:{default:preset.id,roots:[{path:outputRoot,trust:'user'}],includeShippedRoot:false,includeUserRoot:false}};
+    const declare=[{id:'preset-'+preset.id,name:'@deepseek-ai/dsh-agent-preset',config:{id:preset.id,name:preset.name,description:preset.description,plugins:[presetPlugin]}}];
+    const patch=[presetRow,{insert:[...(presetApi==='registry'?declare:[]),{id:'governance-m4',name:pathToFileURL(entryPath).href,config}]}];
     const contents=new Map([['entry.mjs',entry],['host-patch.yml',JSON.stringify(patch,null,2)+'\n'],
-      ['governed-preset/agent.cordis.yml',JSON.stringify([{id:'governed-preset',name:pathToFileURL(entryPath).href,config:{role:'preset'}}],null,2)+'\n'],
-      ['governed-preset/preset.yml',JSON.stringify({name:'Inert governed M4 candidate',description:'No raw tools; diagnostic host prerequisite. Setup does not install or activate.'},null,2)+'\n']]);
+      ['governed-preset/agent.cordis.yml',JSON.stringify([presetPlugin],null,2)+'\n'],
+      ['governed-preset/preset.yml',JSON.stringify({name:preset.name,description:preset.description},null,2)+'\n']]);
     for(const relative of OUTPUTS) {
       await hit('before:'+relative);
       const file=path.join(outputRoot,...relative.split('/')),dir=path.dirname(file);
