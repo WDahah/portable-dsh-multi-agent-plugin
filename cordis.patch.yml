@@ -1,0 +1,13 @@
+# Bundle self-activation patch.
+#
+# Installing this package into a profile — `dsh plugin --profile web add portable-dsh-multi-agent`,
+# a local checkout, or a git URL — mounts the plugin through this row. The row names the package
+# rather than a file path because the loader resolves an installed bundle by name, using the
+# `main` entry in package.json.
+#
+# The state directory defaults to the host home. Set `stateRoot` here to isolate it per profile.
+- insert:
+    - id: portable-multi-agent
+      name: portable-dsh-multi-agent
+      config:
+        enabled: true

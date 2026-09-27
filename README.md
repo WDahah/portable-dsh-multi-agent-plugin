@@ -222,6 +222,14 @@ For live work you need:
 
 This package uses Node built-ins and has no package dependencies; **`npm install` is not required here**. That does not remove the host requirement. Integration was developed against `dsh-tools` **0.1.5-rc.2** and Cordis **^4.0.2**, not every host version.
 
+**Two ways in.** If your host installs plugins with `dsh plugin`, add this package and skip the rest of this section:
+
+```sh
+dsh plugin --profile <name> add git+https://github.com/WDahah/portable-dsh-multi-agent-plugin.git
+```
+
+The package declares a `dsh.bundle` patch, so the profile mounts it by itself and the state directory defaults to `$DSH_HOME/portable-multi-agent-state`; a `stateRoot` in the profile patch overrides that. The copy-and-merge steps below remain the path for hosts that install plugins by hand, and for keeping this package outside the host's own tree.
+
 1. Follow [START-HERE.md](START-HERE.md), or use the scoped prompt in [INSTALL-WITH-AI.md](INSTALL-WITH-AI.md).
 2. Verify the supplied manifest and run the offline tests.
 3. Generate and inspect the local entry and candidate host patch using your actual host module path.

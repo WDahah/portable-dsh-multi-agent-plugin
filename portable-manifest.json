@@ -31,7 +31,7 @@
     },
     {
       "path": "CHANGELOG.md",
-      "sha256": "d2ee6455896335d332b817aad582de31a2784da280e6e3b4bcb706452d88dd1c"
+      "sha256": "18592cc000ef082522354523daa899ba1890c972d80c5861bce0ea89f37e6a03"
     },
     {
       "path": "CODE_OF_CONDUCT.md",
@@ -59,15 +59,15 @@
     },
     {
       "path": "README.i18n.yaml",
-      "sha256": "bb8881c7af341ff802339a464469ac84c0681996def2e06f3960b23d00d723b0"
+      "sha256": "c94a336e23d5e223ea95fe91881056de3b927dab34170306eb39ded0b9228104"
     },
     {
       "path": "README.md",
-      "sha256": "3aca33baa0ae197fbc3135b4edf3fd99cc5d9ba90ca491eb496eed1526dacd5c"
+      "sha256": "7a861efc249fde13acaaf1f2de9a3779b10234d17714068f03d09e53701f3192"
     },
     {
       "path": "README.zh.md",
-      "sha256": "b644f5ab4064d8a4d116ac934e60b590b483eb7cb4b1911ab6592dc8daa4b7df"
+      "sha256": "b61f8de191c0b587fd40139958f75b1729ebc40ead1073bd98fa9b9a103b8a39"
     },
     {
       "path": "SECURITY.md",
@@ -88,6 +88,10 @@
     {
       "path": "VALIDATION.md",
       "sha256": "ef2990f54f9e075fab6595d3fe6dbbba89802b59ddffc8185522199f09a8b4cc"
+    },
+    {
+      "path": "cordis.patch.yml",
+      "sha256": "000e6d4661fb5baa958a8ece78cfa11fde0d862c093e8636c9f4cbc5e37f5980"
     },
     {
       "path": "demo.mjs",
@@ -155,7 +159,7 @@
     },
     {
       "path": "package.json",
-      "sha256": "76e50cad5353bb277340bc0a9fc475944dbbac0bb404969423887ac0a5b329a0"
+      "sha256": "e8dcaa4edd86d150a74b6f798d9ce62e2a069e3e968caf8d8013bbddbfc7e37f"
     },
     {
       "path": "scripts/doctor-governance.mjs",
@@ -196,6 +200,10 @@
     {
       "path": "src/batch.mjs",
       "sha256": "0c478b468997783e490e962471edfaf3ea15f308fb0d326aad00e9c969572ae6"
+    },
+    {
+      "path": "src/bundle-entry.mjs",
+      "sha256": "17a4f423f2c882ddf83dcc03bbe8557268cacea6edad9294d0cd88a6b95d289d"
     },
     {
       "path": "src/cancellation.mjs",
@@ -247,7 +255,7 @@
     },
     {
       "path": "src/plugin.mjs",
-      "sha256": "6bcdc3272f768e75141eabcce49b9cd575a8149c0c36bb328c29615318c84c2d"
+      "sha256": "eb2ca33b2156d406f73fb0c88caf03fcbd97fe7cbbd592074a87b27241e9e0b7"
     },
     {
       "path": "src/probes.mjs",
@@ -280,6 +288,10 @@
     {
       "path": "tests/bridge.test.mjs",
       "sha256": "413eff517f865f4844170119969ef6222bc943c5a0acad81bf37e3119dae5d83"
+    },
+    {
+      "path": "tests/bundle-manifest.test.mjs",
+      "sha256": "e7aeb9a10fc4d24dd10b1120027df21f10ddc1b6272187e2151ac18d833e0980"
     },
     {
       "path": "tests/core.test.mjs",

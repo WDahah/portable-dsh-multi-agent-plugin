@@ -1,4 +1,5 @@
 import path from 'node:path';
+import os from 'node:os';
 import {registerLifetimeTool} from './cancellation.mjs';
 import {ROUTES, POOL_PRIORITY, expectedEffort, resolveRole, selectRoute} from './routes.mjs';
 import {createTaskEngine} from './engine.mjs';
@@ -24,13 +25,28 @@ const REFUSAL_REASONS = new Set(['DISABLED', 'OWNER_REQUIRED', 'OWNER_CAPACITY',
   'DELEGATION_QUEUE_FULL', 'EVIDENCE_EXPIRED', 'JOURNAL_BOUND', 'ASSIGNMENT_REFERENCED_BY_BATCH']);
 const refusalReason = error => typeof error?.code === 'string' && REFUSAL_REASONS.has(error.code) ? error.code : 'UNAVAILABLE';
 
+/**
+ * The state directory used when the operator names none.
+ *
+ * A bundle install (`dsh plugin --profile <name> add`) supplies no config, so the plugin picks the
+ * default that setup offers too: `$DSH_HOME/portable-multi-agent-state`, falling back to `~/.dsh`
+ * when the host exposes no home. An explicit `stateRoot` must still be absolute.
+ * @returns an absolute path. The directory is created on first use, not here.
+ */
+export function defaultStateRoot() {
+  const home = typeof process.env.DSH_HOME === 'string' && process.env.DSH_HOME !== ''
+    ? process.env.DSH_HOME : path.join(os.homedir(), '.dsh');
+  return path.join(home, 'portable-multi-agent-state');
+}
+
 /** Inject the installed host's native defineTool; this package does not vendor DSH. */
 export function createPlugin(defineTool) {
   if (typeof defineTool !== 'function') throw new TypeError('Native defineTool function required');
   return {
   name: 'portable-multi-agent', inject: ['tools'],
   apply(ctx, config = {}) {
-    need(typeof config.stateRoot === 'string' && path.isAbsolute(config.stateRoot), 'ABSOLUTE_STATE_ROOT_REQUIRED');
+    need(config.stateRoot === undefined || (typeof config.stateRoot === 'string' && path.isAbsolute(config.stateRoot)), 'ABSOLUTE_STATE_ROOT_REQUIRED');
+    const stateRoot = config.stateRoot ?? defaultStateRoot();
     const enabled = config.enabled ?? false; need(typeof enabled === 'boolean', 'BOOLEAN_ENABLED_REQUIRED');
     const owners = new Map(); let disposed = false;
     ctx.effect(() => () => {
@@ -45,7 +61,7 @@ export function createPlugin(defineTool) {
       need(!disposed && typeof exec.agent?.id === 'string' && exec.agent.id, 'OWNER_REQUIRED'); exec.signal.throwIfAborted();
       if (!owners.has(exec.agent.id)) {
         need(owners.size < 64, 'OWNER_CAPACITY');
-        const options = {root: config.stateRoot, owner: exec.agent.id, getLlm: () => ctx.get('llm'),
+        const options = {root: stateRoot, owner: exec.agent.id, getLlm: () => ctx.get('llm'),
           getSubagents: () => ctx.get('subagents'), getAttachments: () => ctx.get('attachments')};
         const qualifications = createQualificationManager(options), agents = createAgentDispatcher(options);
         owners.set(exec.agent.id, {qualifications, agents, engine: createTaskEngine(options),

@@ -222,6 +222,14 @@ node demo.mjs
 
 本包只使用 Node 内置模块，没有任何包依赖；**此处不需要 `npm install`**。但这并不免除对宿主的要求。该整合是针对 `dsh-tools` **0.1.5-rc.2** 与 Cordis **^4.0.2** 开发的，并非适用于所有宿主版本。
 
+**两种安装方式。** 如果你的宿主用 `dsh plugin` 安装插件，直接添加本包，然后跳过本节其余步骤：
+
+```sh
+dsh plugin --profile <name> add git+https://github.com/WDahah/portable-dsh-multi-agent-plugin.git
+```
+
+本包声明了 `dsh.bundle` 补丁，因此 profile 会自行挂载它，状态目录默认为 `$DSH_HOME/portable-multi-agent-state`；在 profile 补丁里设置 `stateRoot` 可覆盖该默认值。下面的复制并合并步骤仍然是手工安装插件的宿主、以及把本包放在宿主目录之外时的做法。
+
 1. 按 [START-HERE.md](START-HERE.zh.md) 操作，或使用 [INSTALL-WITH-AI.md](INSTALL-WITH-AI.zh.md) 中有作用域的提示词。
 2. 校验随附的清单并运行离线测试。
 3. 使用你实际的宿主模块路径生成并检查本地入口与候选宿主补丁。

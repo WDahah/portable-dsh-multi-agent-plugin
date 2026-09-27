@@ -4,6 +4,17 @@ This project records user-visible behavior changes. Evidence levels stay distinc
 offline tests, generated artifacts, host activation, and live qualification are separate
 claims, and none of them is promoted by a release note.
 
+## 1.19.0
+
+### Added
+
+- **Bundle installation.** The package declares `dsh.bundle` in `package.json` and ships `cordis.patch.yml`, so a host can install it the way it installs any other plugin: `dsh plugin --profile <name> add git+https://github.com/WDahah/portable-dsh-multi-agent-plugin.git`. Verified against a throwaway DSH home: `dsh plugin add` registered the bundle in `dsh.profile.bundles`, and `--dump-config` composed the `portable-multi-agent` row from the package's own patch. `src/bundle-entry.mjs` takes the host's `defineTool` from the installed `@deepseek-ai/dsh-tools`, falls back to the installation named by `DSH_HOME` for a local `link:` checkout, and refuses loudly when neither resolves.
+- `tests/bundle-manifest.test.mjs` checks the contract a host relies on: the manifest names a patch, the patch mounts the package by name in exactly one row and never bakes a machine-specific `stateRoot` into it, and the entry resolves the host's tools module.
+
+### Changed
+
+- `stateRoot` is optional. A bundle install supplies no config, so the plugin uses the default setup already offers: `$DSH_HOME/portable-multi-agent-state`, or `~/.dsh/portable-multi-agent-state` when the host exposes no home. A supplied `stateRoot` must still be absolute, and the directory is still created on first use. `defaultStateRoot()` is exported for callers that need the same value.
+
 ## 1.18.0
 
 ### Added
